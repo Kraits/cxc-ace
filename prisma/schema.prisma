@@ -1,0 +1,549 @@
+// ============================================================
+// CXC Ace – Comprehensive Prisma Schema
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ======================== ENUMS =============================
+
+enum Role {
+  STUDENT
+  PARENT
+  TEACHER
+}
+
+enum QuestionType {
+  MCQ
+  ESSAY
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SubmissionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ======================== USER ==============================
+// 1. User authentication (email, password hash, name, role)
+
+model User {
+  id             String    @id @default(cuid())
+  email          String    @unique
+  passwordHash   String
+  name           String
+  role           Role      @default(STUDENT)
+  avatarUrl      String?
+  bio            String?
+  // Streak fields (14)
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastStudyAt    DateTime?
+  // Coin balance for shop (15)
+  coins          Int       @default(0)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // ── Relations ──────────────────────────────────────────────
+  questionProgresses   UserQuestionProgress[]
+  topicProgresses      UserTopicProgress[]
+  subjectProgresses    UserSubjectProgress[]
+  flashcardDecks       FlashcardDeck[]
+  notes                Note[]
+  studySessions        StudySession[]
+  bookmarks            Bookmark[]
+  achievements         UserAchievement[]
+  leaderboardEntries   LeaderboardEntry[]
+  examCountdowns       ExamCountdown[]
+  cardReviews          CardReview[]
+  purchases            Purchase[]
+  notificationPrefs    NotificationPreference[]
+  sbaTemplates         SBATemplate[]       @relation("SBACreator")
+  submittedQuestions   Question[]          @relation("QuestionSubmitter")
+  reviewedQuestions    Question[]          @relation("QuestionReviewer")
+  submissions          ContentSubmission[] @relation("SubmissionAuthor")
+  reviews              ContentSubmission[] @relation("SubmissionReviewer")
+
+  @@map("users")
+}
+
+// ======================== SUBJECTS & TOPICS =================
+// 2. Question bank – subjects, topics, tags
+
+model Subject {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  code        String    @unique
+  description String?
+  color       String    @default("#6366f1")
+  icon        String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  topics            Topic[]
+  tags              Tag[]
+  questions         Question[]
+  flashcardDecks    FlashcardDeck[]
+  notes             Note[]
+  studySessions     StudySession[]
+  examCountdowns    ExamCountdown[]
+  sbaTemplates      SBATemplate[]
+  subjectProgresses UserSubjectProgress[]
+
+  @@map("subjects")
+}
+
+model Topic {
+  id          String    @id @default(cuid())
+  name        String
+  subjectId   String
+  description String?
+  order       Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  subject         Subject             @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  topicProgresses UserTopicProgress[]
+  studySessions   StudySession[]
+
+  @@unique([name, subjectId])
+  @@map("topics")
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  subjectId String?
+  color     String   @default("#10b981")
+  createdAt DateTime @default(now())
+
+  subject  Subject?     @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  questions QuestionTag[]
+
+  @@map("tags")
+}
+
+// ======================== QUESTION BANK =====================
+// 2. Question bank (MCQ and essay, difficulty, topic tags)
+// 13. Content submissions (status: PENDING for teacher submissions)
+
+model Question {
+  id             String           @id @default(cuid())
+  type           QuestionType
+  difficulty     Difficulty
+  content        String           // markdown / HTML question text
+  explanation    String?          // detailed solution explanation
+  options        String?          // JSON array of MCQ options [{label, value, isCorrect}]
+  correctAnswer  String           // correct option value or essay model answer
+  subjectId      String
+  topicId        String?
+  source         String?          // e.g. "CXC 2023 Paper 2 Q3"
+  // Content submission workflow (13)
+  status         SubmissionStatus @default(APPROVED)
+  submittedById  String?
+  reviewedById   String?
+  reviewNote     String?
+  reviewedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  subject     Subject               @relation(fields: [subjectId], references: [id])
+  topic       Topic?                @relation(fields: [topicId], references: [id])
+  submittedBy User?                 @relation("QuestionSubmitter", fields: [submittedById], references: [id], onDelete: SetNull)
+  reviewedBy  User?                 @relation("QuestionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+  tags        QuestionTag[]
+  progresses  UserQuestionProgress[]
+  bookmarks   Bookmark[]
+
+  @@index([subjectId])
+  @@index([topicId])
+  @@index([difficulty])
+  @@index([status])
+  @@map("questions")
+}
+
+model QuestionTag {
+  questionId String
+  tagId      String
+
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  tag      Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, tagId])
+  @@map("question_tags")
+}
+
+// ======================== PROGRESS TRACKING ================
+// 3. User progress tracking (per-question, per-topic, per-subject)
+
+model UserQuestionProgress {
+  id            String    @id @default(cuid())
+  userId        String
+  questionId    String
+  attempts      Int       @default(0)
+  correct       Int       @default(0)
+  lastAttemptAt DateTime?
+  mastered      Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("user_question_progress")
+}
+
+model UserTopicProgress {
+  id              String    @id @default(cuid())
+  userId          String
+  topicId         String
+  totalAttempts   Int       @default(0)
+  correctAttempts Int       @default(0)
+  accuracy        Float     @default(0)
+  lastStudiedAt   DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  topic Topic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, topicId])
+  @@index([userId])
+  @@map("user_topic_progress")
+}
+
+model UserSubjectProgress {
+  id               String    @id @default(cuid())
+  userId           String
+  subjectId        String
+  totalAttempts    Int       @default(0)
+  correctAttempts  Int       @default(0)
+  accuracy         Float     @default(0)
+  questionsStudied Int       @default(0)
+  totalQuestions    Int       @default(0)
+  lastStudiedAt    DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subjectId])
+  @@index([userId])
+  @@map("user_subject_progress")
+}
+
+// ======================== FLASHCARDS ========================
+// 4. Flashcard decks and cards
+// 6. Spaced repetition scheduling (SM-2 algorithm)
+
+model FlashcardDeck {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  userId      String
+  subjectId   String?
+  isPublic    Boolean   @default(false)
+  cardCount   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user    User?           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject?        @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  cards   FlashcardCard[]
+  reviews CardReview[]
+
+  @@index([userId])
+  @@map("flashcard_decks")
+}
+
+model FlashcardCard {
+  id        String    @id @default(cuid())
+  front     String    // question / prompt side
+  back      String    // answer / explanation side
+  deckId    String
+  order     Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  deck    FlashcardDeck @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  reviews CardReview[]
+
+  @@index([deckId])
+  @@map("flashcard_cards")
+}
+
+// 6. SM-2 spaced repetition per card per user
+
+model CardReview {
+  id          String    @id @default(cuid())
+  userId      String
+  deckId      String
+  cardId      String
+  ease        Float     @default(2.5)     // easiness factor (min 1.3)
+  interval    Int       @default(0)       // days until next review
+  repetitions Int       @default(0)       // consecutive correct reps
+  nextReview  DateTime  @default(now())
+  lastReview  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deck FlashcardDeck  @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  card FlashcardCard  @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cardId])
+  @@index([userId, nextReview])
+  @@map("card_reviews")
+}
+
+// ======================== NOTES =============================
+// 5. User notes (subject, color, sharing)
+
+model Note {
+  id        String    @id @default(cuid())
+  title     String
+  content   String    @default("")        // markdown content
+  subjectId String?
+  color     String    @default("#ffffff")
+  isShared  Boolean   @default(false)
+  isPinned  Boolean   @default(false)
+  userId    String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([isShared])
+  @@map("notes")
+}
+
+// ======================== STUDY SESSIONS ====================
+// 7. Study sessions / timer logs
+
+model StudySession {
+  id                String    @id @default(cuid())
+  userId            String
+  subjectId         String?
+  topicId           String?
+  type              String    @default("general") // "practice" | "flashcards" | "review" | "general"
+  durationSeconds   Int       @default(0)
+  questionsAnswered Int       @default(0)
+  correctAnswers    Int       @default(0)
+  startedAt         DateTime
+  endedAt           DateTime?
+  createdAt         DateTime  @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+  topic   Topic?   @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([startedAt])
+  @@map("study_sessions")
+}
+
+// ======================== BOOKMARKS =========================
+// 8. Bookmarked / flagged questions
+
+model Bookmark {
+  id         String   @id @default(cuid())
+  userId     String
+  questionId String
+  flagged    Boolean  @default(false)      // flagged for review
+  note       String?                       // optional personal note
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, questionId])
+  @@index([userId])
+  @@map("bookmarks")
+}
+
+// ======================== ACHIEVEMENTS =====================
+// 9. Achievements / badges (user unlockable)
+
+model Achievement {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  icon        String   @default("trophy")   // icon name / emoji
+  category    String   @default("general")  // "streak" | "score" | "study" | "social" | "general"
+  criteria    String                           // JSON: { type, value, ... }
+  points      Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  users UserAchievement[]
+
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String   @id @default(cuid())
+  userId        String
+  achievementId String
+  unlockedAt    DateTime @default(now())
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  achievement Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, achievementId])
+  @@index([userId])
+  @@map("user_achievements")
+}
+
+// ======================== LEADERBOARD ======================
+// 10. Leaderboard entries (weekly snapshot)
+
+model LeaderboardEntry {
+  id        String   @id @default(cuid())
+  userId    String
+  weekStart DateTime                      // Monday of that week
+  score     Int      @default(0)
+  rank      Int
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+  @@index([weekStart])
+  @@index([weekStart, score])
+  @@map("leaderboard_entries")
+}
+
+// ======================== EXAM COUNTDOWN ===================
+// 11. Exam countdown configuration
+
+model ExamCountdown {
+  id         String    @id @default(cuid())
+  userId     String
+  subjectId  String?
+  examName   String
+  examDate   DateTime
+  isNotified Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  subject Subject? @relation(fields: [subjectId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([examDate])
+  @@map("exam_countdowns")
+}
+
+// ======================== SBA TEMPLATES =====================
+// 12. SBA (School-Based Assessment) templates
+
+model SBATemplate {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  subjectId   String
+  structure   String                          // JSON: sections, guidelines, rubric
+  isPublic    Boolean   @default(true)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  subject   Subject @relation(fields: [subjectId], references: [id])
+  createdBy User    @relation("SBACreator", fields: [createdById], references: [id])
+
+  @@index([subjectId])
+  @@index([isPublic])
+  @@map("sba_templates")
+}
+
+// ======================== CONTENT SUBMISSIONS ==============
+// 13. Teacher-submitted content pending review
+
+model ContentSubmission {
+  id            String           @id @default(cuid())
+  type          String                              // "question" | "flashcard_deck" | "note" | "sba_template"
+  title         String
+  content       String                              // JSON payload of the submitted content
+  status        SubmissionStatus @default(PENDING)
+  submittedById String
+  reviewedById  String?
+  reviewNote    String?
+  submittedAt   DateTime         @default(now())
+  reviewedAt    DateTime?
+
+  submittedBy User? @relation("SubmissionAuthor", fields: [submittedById], references: [id], onDelete: Cascade)
+  reviewedBy  User? @relation("SubmissionReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([submittedById])
+  @@index([status])
+  @@map("content_submissions")
+}
+
+// ======================== SHOP ==============================
+// 15. Shop purchases
+
+model ShopItem {
+  id          String    @id @default(cuid())
+  name        String
+  description String
+  price       Int       @default(0)             // cost in coins
+  type        String                            // "avatar" | "theme" | "boost" | "badge" | "streak_freeze" | "hint_pack"
+  metadata    String?                           // JSON: item-specific config
+  imageUrl    String?
+  isActive    Boolean   @default(true)
+  stock       Int?                              // null = unlimited
+  createdAt   DateTime  @default(now())
+
+  purchases Purchase[]
+
+  @@index([isActive])
+  @@map("shop_items")
+}
+
+model Purchase {
+  id         String   @id @default(cuid())
+  userId     String
+  shopItemId String
+  coinsSpent Int
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  shopItem ShopItem @relation(fields: [shopItemId], references: [id])
+
+  @@unique([userId, shopItemId])
+  @@index([userId])
+  @@map("purchases")
+}
+
+// ======================== NOTIFICATION PREFERENCES ==========
+// 16. Notification preferences
+
+model NotificationPreference {
+  id      String  @id @default(cuid())
+  userId  String
+  type    String                               // "study_reminder" | "streak_warning" | "exam_reminder" | "achievement" | "weekly_report" | "new_content" | "marketing"
+  enabled Boolean @default(true)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, type])
+  @@index([userId])
+  @@map("notification_preferences")
+}
