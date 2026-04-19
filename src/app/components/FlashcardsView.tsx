@@ -29,7 +29,7 @@ export default function FlashcardsView() {
   const [newSubjectId, setNewSubjectId] = useState('');
   const [activeDeck, setActiveDeck] = useState<Deck | null>(null);
   const [reviewMode, setReviewMode] = useState(false);
-  const [reviewCards, setReviewCards] = useState<Array<{ id: string; front: string; back: string; deck?: { title: string; subject?: { name: string; color: string } } }>>([]);
+  const [reviewCards, setReviewCards] = useState<Array<{ id: string; front: string; back: string; deck?: { id: string; title: string; subject?: { name: string; color: string } } }>>([]);
   const [currentCard, setCurrentCard] = useState(0);
   const [flipped, setFlipped] = useState(false);
   const [addCardOpen, setAddCardOpen] = useState(false);

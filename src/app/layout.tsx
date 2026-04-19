@@ -16,10 +16,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CXC Ace — Caribbean Exam Prep",
-  description: "Smart Caribbean exam preparation for CSEC and CAPE students",
-  keywords: ["CXC", "CAPE", "Caribbean exams", "exam prep", "CSEC", "study tool"],
+  description:
+    "Smart Caribbean exam preparation platform for CSEC and CAPE students. Practice with MCQs, AI tutoring, flashcards, and track your progress.",
+  keywords: [
+    "CXC", "CAPE", "Caribbean exams", "exam prep", "CSEC", "study tool",
+    "Caribbean education", "CSEC Mathematics", "CSEC English", "CSEC Biology",
+    "CSEC Chemistry", "CSEC Physics", "CAPE Pure Mathematics", "CAPE Caribbean Studies",
+    "flashcards", "quiz", "AI tutor",
+  ],
+  authors: [{ name: "CXC Ace Team" }],
+  openGraph: {
+    title: "CXC Ace — Caribbean Exam Prep",
+    description: "Smart Caribbean exam preparation for CSEC and CAPE students",
+    type: "website",
+  },
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/logo.svg",
   },
 };
 
