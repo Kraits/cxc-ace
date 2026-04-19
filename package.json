@@ -3,8 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "description": "Smart Caribbean exam preparation platform for CSEC and CAPE students with AI tutoring, flashcards, progress tracking, and more.",
-  "author": "CXC Ace Team",
+  "author": "Kraits (https://github.com/Kraits)",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kraits/cxc-ace.git"
+  },
+  "homepage": "https://github.com/Kraits/cxc-ace#readme",
+  "bugs": {
+    "url": "https://github.com/Kraits/cxc-ace/issues"
+  },
   "keywords": ["cxc", "cape", "caribbean", "exam", "prep", "education", "csec", "study", "quiz", "flashcards"],
   "scripts": {
     "dev": "next dev -p 3000",

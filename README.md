@@ -1,6 +1,8 @@
 # CXC Ace — Caribbean Exam Prep
 
 > Smart, modern exam preparation platform for **CSEC** and **CAPE** students across the Caribbean.
+>
+> By [Kraits](https://github.com/Kraits)
 
 [![Next.js](https://img.shields.io/badge/Next.js-16-black?logo=next.js)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
@@ -60,7 +62,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/your-username/cxc-ace.git
+git clone https://github.com/Kraits/cxc-ace.git
 cd cxc-ace
 
 # Install dependencies
@@ -223,4 +225,14 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ---
 
+---
+
 Built for Caribbean students, by Caribbean students.
+
+<br>
+
+<p align="center">
+  <a href="https://github.com/Kraits">
+    <img src="https://github.com/Kraits.png" width="48" alt="Kraits" />
+  </a>
+</p>
