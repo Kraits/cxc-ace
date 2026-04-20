@@ -10,7 +10,9 @@ import {
 import {
   ArrowLeft, Bookmark, Check, X, Dumbbell, Timer, Play,
   ChevronRight, HomeIcon, RotateCcw, CheckCircle2, XCircle,
+  Sparkles, Zap,
 } from '@/app/lib/icons';
+import { Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +22,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useToast } from '@/hooks/use-toast';
 
 export function SubjectSelection() {
-  const { subjects, setRoute, stats } = useStore();
+  const { subjects, setRoute, stats, user } = useStore();
+
+  const startQuickQuizAll = () => {
+    const params = new URLSearchParams();
+    params.set('count', '10');
+    if (user?.id) params.set('userId', user.id);
+    setRoute(`#quiz-taking-practice-${encodeURIComponent(params.toString())}`);
+  };
+
+  const startQuickQuizSubject = (e: React.MouseEvent, subjectId: string) => {
+    e.stopPropagation();
+    const params = new URLSearchParams();
+    params.set('subjectId', subjectId);
+    params.set('count', '5');
+    if (user?.id) params.set('userId', user.id);
+    setRoute(`#quiz-taking-practice-${encodeURIComponent(params.toString())}`);
+  };
 
   return (
     <div className="space-y-4 pb-4">
@@ -30,6 +48,44 @@ export function SubjectSelection() {
         </Button>
         <h2 className="text-xl font-bold">Choose a Subject</h2>
       </div>
+
+      {/* Quick Quiz Card — All Subjects */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+      >
+        <motion.div whileTap={{ scale: 0.98 }}>
+          <Card
+            className="relative overflow-hidden cursor-pointer border-2 border-emerald-400 dark:border-emerald-600 hover:shadow-lg hover:border-emerald-500 transition-all duration-200"
+            onClick={startQuickQuizAll}
+          >
+            {/* Gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 opacity-10 dark:opacity-20" />
+            <div className="relative flex items-center gap-4 p-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md">
+                <Shuffle className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-emerald-700 dark:text-emerald-400">Quick Quiz</h3>
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  10 random questions across all subjects
+                </p>
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-1">
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400 hover:bg-emerald-100 border-0 text-xs">
+                  <Zap className="w-3 h-3 mr-1" /> Practice
+                </Badge>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      </motion.div>
+
+      {/* Subject Grid */}
       <div className="grid grid-cols-2 gap-3">
         {subjects.map((sub, i) => {
           const sp = stats?.subjectProgresses?.find(s => s.subjectId === sub.id);
@@ -41,10 +97,20 @@ export function SubjectSelection() {
               transition={{ delay: i * 0.05 }}
               whileTap={{ scale: 0.97 }}
               onClick={() => setRoute(`#quiz-config-${sub.id}`)}
-              className="text-left"
+              className="text-left relative"
             >
               <Card className="p-4 h-full hover:shadow-lg transition-all duration-200 border-2 hover:border-emerald-300 dark:hover:border-emerald-700">
-                <div className="text-3xl mb-2">{SUBJECT_ICONS[sub.name] || '📚'}</div>
+                <div className="flex items-start justify-between">
+                  <div className="text-3xl mb-2">{SUBJECT_ICONS[sub.name] || '📚'}</div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    className="h-7 px-2 text-xs font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-900/60 shrink-0"
+                    onClick={(e) => startQuickQuizSubject(e, sub.id)}
+                  >
+                    <Zap className="w-3 h-3 mr-0.5" /> Quick
+                  </Button>
+                </div>
                 <h3 className="font-semibold text-sm leading-tight">{sub.name}</h3>
                 <p className="text-xs text-muted-foreground mt-1">{sub.code}</p>
                 {sp && (
