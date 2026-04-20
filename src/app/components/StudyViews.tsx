@@ -1,14 +1,15 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
-  useStore, formatDuration, SUBJECT_ICONS,
-  type StudySession,
+  useStore, formatDuration, SUBJECT_ICONS, fadeIn, slideIn,
+  type StudySession, type Note,
 } from '@/app/lib/store';
-import { Timer, Play, Pause, RotateCcw, Clock, Layers, MessageCircle, StickyNote } from '@/app/lib/icons';
+import { Timer, Play, Pause, RotateCcw, Clock, Layers, MessageCircle, StickyNote, BookOpen, ChevronRight, ChevronLeft, Search, GraduationCap } from '@/app/lib/icons';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,166 @@ import { useToast } from '@/hooks/use-toast';
 import FlashcardsView from './FlashcardsView';
 import AITutor from './AITutor';
 import NotesView from './NotesView';
+
+// ─── Study Guides Library ──────────────────────────────────
+function StudyGuides() {
+  const { subjects, setRoute } = useStore();
+  const [guides, setGuides] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('ALL');
+  const [expandedGuide, setExpandedGuide] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetch('/api/notes?view=shared')
+      .then(r => r.json())
+      .then(d => { setGuides(d.notes || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const filtered = guides.filter(g => {
+    if (search && !g.title.toLowerCase().includes(search.toLowerCase()) && !g.content.toLowerCase().includes(search.toLowerCase())) return false;
+    if (selectedSubject !== 'ALL' && g.subject?.id !== selectedSubject) return false;
+    return true;
+  });
+
+  // Group by subject
+  const grouped = new Map<string, Note[]>();
+  filtered.forEach(g => {
+    const key = g.subject?.name || 'Other';
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(g);
+  });
+
+  if (expandedGuide) {
+    const guide = guides.find(g => g.id === expandedGuide);
+    if (!guide) return null;
+    return (
+      <div className="space-y-4 pb-4">
+        <div className="flex items-center gap-3">
+          <Button variant="ghost" size="icon" onClick={() => setExpandedGuide(null)}>
+            <ChevronLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex-1">
+            {guide.subject && (
+              <Badge variant="outline" className="text-xs mb-1" style={{ borderColor: guide.subject.color }}>
+                {SUBJECT_ICONS[guide.subject.name] || '📚'} {guide.subject.name}
+              </Badge>
+            )}
+            <h2 className="text-lg font-bold">{guide.title}</h2>
+          </div>
+        </div>
+        <div className="prose prose-sm dark:prose-invert max-w-none bg-white dark:bg-zinc-900 rounded-xl p-5 border">
+          <div className="whitespace-pre-wrap leading-relaxed text-sm" dangerouslySetInnerHTML={{
+            __html: guide.content
+              .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-6 mb-3 text-emerald-700 dark:text-emerald-400">$1</h1>')
+              .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-5 mb-2 border-b pb-1">$1</h2>')
+              .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-4 mb-1">$1</h3>')
+              .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+              .replace(/`(.*?)`/g, '<code class="bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-xs font-mono">$1</code>')
+              .replace(/^- (.*$)/gm, '<li class="ml-4">$1</li>')
+              .replace(/^\d+\. (.*$)/gm, '<li class="ml-4 list-decimal">$1</li>')
+              .replace(/^---$/gm, '<hr class="my-4 border-zinc-200 dark:border-zinc-700">')
+          }} />
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4 pb-4">
+      <h2 className="text-xl font-bold flex items-center gap-2">
+        <GraduationCap className="w-5 h-5 text-emerald-600" /> Study Guides
+      </h2>
+      <p className="text-sm text-muted-foreground">Comprehensive notes for every topic across all subjects</p>
+
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <motion.div className="w-8 h-8 border-4 border-emerald-200 border-t-emerald-600 rounded-full" animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }} />
+        </div>
+      ) : (
+        <>
+          {/* Search */}
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search study guides..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+
+          {/* Subject Filter */}
+          <div className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+            <Button
+              size="sm" variant={selectedSubject === 'ALL' ? 'default' : 'outline'}
+              onClick={() => setSelectedSubject('ALL')}
+              className={selectedSubject === 'ALL' ? 'bg-emerald-600 hover:bg-emerald-700 shrink-0' : 'shrink-0'}
+            >
+              All
+            </Button>
+            {subjects.map(s => (
+              <Button
+                key={s.id}
+                size="sm" variant={selectedSubject === s.id ? 'default' : 'outline'}
+                onClick={() => setSelectedSubject(s.id)}
+                className={selectedSubject === s.id ? 'bg-emerald-600 hover:bg-emerald-700 shrink-0' : 'shrink-0'}
+              >
+                {SUBJECT_ICONS[s.name] || '📚'} {s.name}
+              </Button>
+            ))}
+          </div>
+
+          {/* Guides List */}
+          {filtered.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-30" />
+              <p>No study guides found</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {Array.from(grouped.entries()).map(([subjectName, subjectGuides]) => {
+                const sub = subjects.find(s => s.name === subjectName);
+                return (
+                  <div key={subjectName}>
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-lg">{SUBJECT_ICONS[subjectName] || '📚'}</span>
+                      <h3 className="font-semibold text-sm">{subjectName}</h3>
+                      <Badge variant="secondary" className="text-xs">{subjectGuides.length} guides</Badge>
+                    </div>
+                    <div className="space-y-2 ml-7">
+                      {subjectGuides.map(guide => (
+                        <motion.button
+                          key={guide.id}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setExpandedGuide(guide.id)}
+                          className="w-full text-left"
+                        >
+                          <Card className="p-3 hover:shadow-md transition-all border hover:border-emerald-300 dark:hover:border-emerald-700">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1">
+                                <h4 className="font-medium text-sm">{guide.title.replace('Study Guide: ', '')}</h4>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {guide.content.length > 200 ? Math.floor(guide.content.length / 200) + ' sections' : 'Quick guide'}
+                                </p>
+                              </div>
+                              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </Card>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
 function StudyTimer() {
   const { user, subjects } = useStore();
@@ -219,7 +380,7 @@ function StudyTimer() {
 }
 
 export function StudyHub() {
-  const [tab, setTab] = useState('flashcards');
+  const [tab, setTab] = useState('guides');
 
   return (
     <div>
@@ -228,7 +389,10 @@ export function StudyHub() {
         <p className="text-sm text-muted-foreground">Flashcards, AI Tutor, Notes & Timer</p>
       </div>
       <Tabs value={tab} onValueChange={setTab}>
-        <TabsList className="w-full grid grid-cols-4">
+        <TabsList className="w-full grid grid-cols-5">
+          <TabsTrigger value="guides" className="text-xs">
+            <BookOpen className="w-3.5 h-3.5 mr-1 hidden sm:inline" /> Guides
+          </TabsTrigger>
           <TabsTrigger value="flashcards" className="text-xs">
             <Layers className="w-3.5 h-3.5 mr-1 hidden sm:inline" /> Cards
           </TabsTrigger>
@@ -244,6 +408,7 @@ export function StudyHub() {
         </TabsList>
       </Tabs>
       <div className="mt-4">
+        {tab === 'guides' && <StudyGuides />}
         {tab === 'flashcards' && <FlashcardsView />}
         {tab === 'tutor' && <AITutor />}
         {tab === 'notes' && <NotesView />}

@@ -101,6 +101,37 @@ export default function HomeDashboard() {
         </div>
       </motion.div>
 
+      {/* Quick Quiz - Start with one tap */}
+      <motion.div {...fadeIn} transition={{ delay: 0.12 }}>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="font-semibold text-lg flex items-center gap-2">
+            <BookOpen className="w-5 h-5 text-emerald-600" /> Quick Quiz
+          </h3>
+          <Button variant="ghost" size="sm" onClick={() => setRoute('#quiz')}>
+            All Subjects <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {subjects.slice(0, 6).map(sub => (
+            <motion.button
+              key={sub.id}
+              whileTap={{ scale: 0.96 }}
+              onClick={() => {
+                const params = new URLSearchParams({ subjectId: sub.id, count: '10' });
+                setRoute(`#quiz-taking-practice-${encodeURIComponent(params.toString())}`);
+              }}
+              className="text-left"
+            >
+              <Card className="p-3 hover:shadow-md transition-all border hover:border-emerald-300 dark:hover:border-emerald-700">
+                <div className="text-2xl text-center mb-1">{SUBJECT_ICONS[sub.name] || '📚'}</div>
+                <p className="text-xs font-medium text-center leading-tight">{sub.name}</p>
+                <p className="text-[10px] text-muted-foreground text-center">{sub._count?.questions || 0} Q</p>
+              </Card>
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
+
       {/* Subject Progress */}
       <motion.div {...fadeIn} transition={{ delay: 0.15 }}>
         <div className="flex items-center justify-between mb-3">
