@@ -1,12 +1,18 @@
+import { createClient } from '@libsql/client'
 import { PrismaClient, Difficulty } from '@prisma/client'
 import { PrismaLibSQL } from '@prisma/adapter-libsql'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as readline from 'readline'
 
-const adapter = new PrismaLibSQL({
-  url: process.env.DATABASE_URL!,
-  authToken: process.env.DATABASE_AUTH_TOKEN || undefined,
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
 })
 
-const db = new PrismaClient({ adapter } as never)
+function question(prompt: string): Promise<string> {
+  return new Promise((resolve) => rl.question(prompt, resolve))
+}
 
 // Helper to create a question with options
 function mcq(
@@ -45,7 +51,6 @@ const SUBJECTS = [
   { name: 'Caribbean Studies', code: 'CAPE-CS', description: 'CAPE Caribbean Studies', color: '#f97316', icon: '🏝️', topics: ['Caribbean Identity', 'Culture & Society', 'Economic Development', 'Political Development', 'Globalization', 'Regional Integration'] },
 ]
 
-// Question bank data - comprehensive for each subject
 const QUESTIONS: Record<string, ReturnType<typeof mcq>[]> = {
   'CSEC-MATH': [
     mcq('What is the value of 3² + 4²?', [{label:'A',value:'25',isCorrect:true},{label:'B',value:'12',isCorrect:false},{label:'C',value:'7',isCorrect:false},{label:'D',value:'49',isCorrect:false}], 'Using the order of operations: 3² = 9, 4² = 16, and 9 + 16 = 25.', EASY, 'Number Theory & Computation'),
@@ -68,7 +73,7 @@ const QUESTIONS: Record<string, ReturnType<typeof mcq>[]> = {
     mcq('The mode of the data set {3, 5, 5, 7, 8, 5, 9} is:', [{label:'A',value:'7',isCorrect:false},{label:'B',value:'3',isCorrect:false},{label:'C',value:'5',isCorrect:true},{label:'D',value:'8',isCorrect:false}], 'Mode is the most frequent value. 5 appears 3 times, more than any other number.', EASY, 'Statistics & Probability'),
     mcq('Factorize: x² - 9', [{label:'A',value:'(x+3)(x-3)',isCorrect:true},{label:'B',value:'(x+9)(x-1)',isCorrect:false},{label:'C',value:'(x-3)²',isCorrect:false},{label:'D',value:'(x+3)²',isCorrect:false}], 'This is a difference of two squares: x² - 3² = (x+3)(x-3).', MEDIUM, 'Algebra'),
     mcq('If f(x) = 2x - 1, what is f(4)?', [{label:'A',value:'7',isCorrect:true},{label:'B',value:'5',isCorrect:false},{label:'C',value:'9',isCorrect:false},{label:'D',value:'6',isCorrect:false}], 'f(4) = 2(4) - 1 = 8 - 1 = 7.', EASY, 'Relations & Functions'),
-    mcq('Two cards are drawn from a standard deck. What is the probability both are aces?', [{label:'A',value:'1/169',isCorrect:false},{label:'B',value:'4/52 × 3/51 = 1/221',isCorrect:true},{label:'C',value:'1/52',isCorrect:false},{label:'D',value:'4/52 × 4/52 = 1/169',isCorrect:false}], 'P(first ace) = 4/52. Without replacement: P(second ace) = 3/51. P = 4/52 × 3/51 = 12/2652 = 1/221.', HARD, 'Statistics & Probability'),
+    mcq('Two cards are drawn from a standard deck. What is the probability both are aces?', [{label:'A',value:'1/169',isCorrect:false},{label:'B',value:'1/221',isCorrect:true},{label:'C',value:'1/52',isCorrect:false},{label:'D',value:'1/169',isCorrect:false}], 'P(first ace) = 4/52. Without replacement: P(second ace) = 3/51. P = 4/52 × 3/51 = 1/221.', HARD, 'Statistics & Probability'),
   ],
   'CSEC-ENG': [
     mcq('Which of the following is a proper noun?', [{label:'A',value:'river',isCorrect:false},{label:'B',value:'Jamaica',isCorrect:true},{label:'C',value:'beautiful',isCorrect:false},{label:'D',value:'quickly',isCorrect:false}], 'A proper noun names a specific place, person, or thing and is capitalized. Jamaica is a proper noun.', EASY, 'Grammar & Mechanics'),
@@ -80,7 +85,7 @@ const QUESTIONS: Record<string, ReturnType<typeof mcq>[]> = {
     mcq('Which of the following is an example of a metaphor?', [{label:'A',value:'She runs like the wind.',isCorrect:false},{label:'B',value:'The world is a stage.',isCorrect:true},{label:'C',value:'He is as brave as a lion.',isCorrect:false},{label:'D',value:'The water was cold as ice.',isCorrect:false}], 'A metaphor directly states one thing IS another. "The world is a stage" is a metaphor. The others are similes using "like" or "as".', MEDIUM, 'Comprehension'),
     mcq('A summary should:', [{label:'A',value:'Include your personal opinions',isCorrect:false},{label:'B',value:'Be longer than the original text',isCorrect:false},{label:'C',value:'Capture the main ideas concisely',isCorrect:true},{label:'D',value:'Copy exact sentences from the text',isCorrect:false}], 'A summary should condense the main ideas of a text without adding personal opinions or copying verbatim.', EASY, 'Summary Writing'),
     mcq('In a persuasive essay, which technique involves appealing to emotions?', [{label:'A',value:'Ethos',isCorrect:false},{label:'B',value:'Pathos',isCorrect:true},{label:'C',value:'Logos',isCorrect:false},{label:'D',value:'Kairos',isCorrect:false}], 'Pathos is the appeal to emotion. Ethos appeals to credibility, Logos to logic.', MEDIUM, 'Persuasive Writing'),
-    mcq('What is the correct punctuation for the following: "I cant believe its already December"', [{label:'A',value:'I can\'t believe it\'s already December.',isCorrect:true},{label:'B',value:'I cant believe its already December.',isCorrect:false},{label:'C',value:'I can\'t believe its already December.',isCorrect:false},{label:'D',value:'I cant believe it\'s already December.',isCorrect:false}], 'Both contractions need apostrophes: "can\'t" (can not) and "it\'s" (it is).', EASY, 'Grammar & Mechanics'),
+    mcq('What is the correct punctuation for the following: "I cant believe its already December"', [{label:'A',value:"I can't believe it's already December.",isCorrect:true},{label:'B',value:'I cant believe its already December.',isCorrect:false},{label:'C',value:"I can't believe its already December.",isCorrect:false},{label:'D',value:"I cant believe it's already December.",isCorrect:false}], "Both contractions need apostrophes: \"can't\" (can not) and \"it's\" (it is).", EASY, 'Grammar & Mechanics'),
     mcq('Which literary device is used in: "The wind whispered through the trees"?', [{label:'A',value:'Simile',isCorrect:false},{label:'B',value:'Metaphor',isCorrect:false},{label:'C',value:'Personification',isCorrect:true},{label:'D',value:'Alliteration',isCorrect:false}], 'Personification gives human qualities (whispering) to non-human things (wind).', MEDIUM, 'Comprehension'),
     mcq('The prefix "un-" in "unhappy" means:', [{label:'A',value:'very',isCorrect:false},{label:'B',value:'not',isCorrect:true},{label:'C',value:'again',isCorrect:false},{label:'D',value:'before',isCorrect:false}], '"Un-" is a prefix meaning "not". So "unhappy" means "not happy".', EASY, 'Grammar & Mechanics'),
     mcq('Which sentence demonstrates correct subject-verb agreement?', [{label:'A',value:'The dogs runs in the park.',isCorrect:false},{label:'B',value:'The dog run in the park.',isCorrect:false},{label:'C',value:'The dogs run in the park.',isCorrect:true},{label:'D',value:'The dog runs in the parks.',isCorrect:false}], 'Plural subject "dogs" requires the plural verb "run".', EASY, 'Grammar & Mechanics'),
@@ -116,7 +121,7 @@ const QUESTIONS: Record<string, ReturnType<typeof mcq>[]> = {
     mcq('What type of reaction is: 2Na + Cl₂ → 2NaCl?', [{label:'A',value:'Decomposition',isCorrect:false},{label:'B',value:'Synthesis/Combination',isCorrect:true},{label:'C',value:'Single replacement',isCorrect:false},{label:'D',value:'Double replacement',isCorrect:false}], 'Two elements combine to form one compound — this is a synthesis (combination) reaction.', MEDIUM, 'Chemical Bonding'),
     mcq('What is the general formula for alkanes?', [{label:'A',value:'CₙH₂ₙ',isCorrect:false},{label:'B',value:'CₙH₂ₙ₊₂',isCorrect:true},{label:'C',value:'CₙH₂ₙ₋₂',isCorrect:false},{label:'D',value:'CₙHₙ',isCorrect:false}], 'Alkanes have single bonds only: general formula CₙH₂ₙ₊₂. Methane = CH₄, Ethane = C₂H₆.', MEDIUM, 'Organic Chemistry'),
     mcq('Which gas is produced when an acid reacts with a metal?', [{label:'A',value:'Oxygen',isCorrect:false},{label:'B',value:'Carbon dioxide',isCorrect:false},{label:'C',value:'Hydrogen',isCorrect:true},{label:'D',value:'Nitrogen',isCorrect:false}], 'Acid + Metal → Salt + Hydrogen gas. E.g., Zn + 2HCl → ZnCl₂ + H₂.', MEDIUM, 'Acids, Bases & Salts'),
-    mcq('What is Avogadro\'s number?', [{label:'A',value:'6.022 × 10²³',isCorrect:true},{label:'B',value:'3.14 × 10²³',isCorrect:false},{label:'C',value:'6.022 × 10²⁰',isCorrect:false},{label:'D',value:'1.602 × 10¹⁹',isCorrect:false}], 'Avogadro\'s number (6.022 × 10²³) is the number of particles in one mole of a substance.', MEDIUM, 'Stoichiometry'),
+    mcq("What is Avogadro's number?", [{label:'A',value:'6.022 × 10²³',isCorrect:true},{label:'B',value:'3.14 × 10²³',isCorrect:false},{label:'C',value:'6.022 × 10²⁰',isCorrect:false},{label:'D',value:'1.602 × 10¹⁹',isCorrect:false}], "Avogadro's number (6.022 × 10²³) is the number of particles in one mole of a substance.", MEDIUM, 'Stoichiometry'),
     mcq('What type of bonding is present in sodium chloride (NaCl)?', [{label:'A',value:'Covalent',isCorrect:false},{label:'B',value:'Ionic',isCorrect:true},{label:'C',value:'Metallic',isCorrect:false},{label:'D',value:'Hydrogen',isCorrect:false}], 'NaCl forms ionic bonds where sodium transfers an electron to chlorine, creating Na⁺ and Cl⁻ ions.', MEDIUM, 'Chemical Bonding'),
     mcq('What is the first member of the alkene series?', [{label:'A',value:'Methane',isCorrect:false},{label:'B',value:'Ethene',isCorrect:true},{label:'C',value:'Propene',isCorrect:false},{label:'D',value:'Butene',isCorrect:false}], 'The simplest alkene is ethene (C₂H₄). Methane is an alkane, not an alkene.', MEDIUM, 'Organic Chemistry'),
     mcq('In the Haber process, what gases are combined to make ammonia?', [{label:'A',value:'Nitrogen and oxygen',isCorrect:false},{label:'B',value:'Nitrogen and hydrogen',isCorrect:true},{label:'C',value:'Oxygen and hydrogen',isCorrect:false},{label:'D',value:'Carbon and nitrogen',isCorrect:false}], 'N₂ + 3H₂ → 2NH₃. The Haber process combines nitrogen and hydrogen to produce ammonia.', HARD, 'Industrial Chemistry'),
@@ -125,12 +130,12 @@ const QUESTIONS: Record<string, ReturnType<typeof mcq>[]> = {
     mcq('What is the SI unit of force?', [{label:'A',value:'Joule',isCorrect:false},{label:'B',value:'Newton',isCorrect:true},{label:'C',value:'Watt',isCorrect:false},{label:'D',value:'Pascal',isCorrect:false}], 'Force is measured in Newtons (N). F = ma.', EASY, 'Mechanics'),
     mcq('What is the acceleration due to gravity on Earth?', [{label:'A',value:'8.9 m/s²',isCorrect:false},{label:'B',value:'10.8 m/s²',isCorrect:false},{label:'C',value:'9.8 m/s²',isCorrect:true},{label:'D',value:'11.2 m/s²',isCorrect:false}], 'Standard value: g ≈ 9.8 m/s² (often approximated as 10 m/s² in calculations).', EASY, 'Mechanics'),
     mcq('A car travels 100 km in 2 hours. What is its average speed?', [{label:'A',value:'25 km/h',isCorrect:false},{label:'B',value:'50 km/h',isCorrect:true},{label:'C',value:'100 km/h',isCorrect:false},{label:'D',value:'200 km/h',isCorrect:false}], 'Speed = Distance/Time = 100/2 = 50 km/h.', EASY, 'Mechanics'),
-    mcq('What is Newton\'s Second Law of Motion?', [{label:'A',value:'Every action has an equal and opposite reaction',isCorrect:false},{label:'B',value:'F = ma',isCorrect:true},{label:'C',value:'An object at rest stays at rest',isCorrect:false},{label:'D',value:'Energy cannot be created or destroyed',isCorrect:false}], 'Newton\'s Second Law: Force = mass × acceleration (F = ma).', EASY, 'Mechanics'),
-    mcq('What is the SI unit of electrical resistance?', [{label:'A',value:'Volt',isCorrect:false},{label:'B',value:'Ampere',isCorrect:false},{label:'C',value:'Ohm',isCorrect:true},{label:'D',value:'Watt',isCorrect:false}], 'Resistance is measured in Ohms (Ω). Ohm\'s Law: V = IR.', EASY, 'Electricity & Magnetism'),
+    mcq("What is Newton's Second Law of Motion?", [{label:'A',value:'Every action has an equal and opposite reaction',isCorrect:false},{label:'B',value:'F = ma',isCorrect:true},{label:'C',value:'An object at rest stays at rest',isCorrect:false},{label:'D',value:'Energy cannot be created or destroyed',isCorrect:false}], "Newton's Second Law: Force = mass × acceleration (F = ma).", EASY, 'Mechanics'),
+    mcq('What is the SI unit of electrical resistance?', [{label:'A',value:'Volt',isCorrect:false},{label:'B',value:'Ampere',isCorrect:false},{label:'C',value:'Ohm',isCorrect:true},{label:'D',value:'Watt',isCorrect:false}], "Resistance is measured in Ohms (Ω). Ohm's Law: V = IR.", EASY, 'Electricity & Magnetism'),
     mcq('What is the formula for kinetic energy?', [{label:'A',value:'KE = mgh',isCorrect:false},{label:'B',value:'KE = ½mv²',isCorrect:true},{label:'C',value:'KE = Fd',isCorrect:false},{label:'D',value:'KE = mc²',isCorrect:false}], 'Kinetic Energy = ½mv² where m is mass and v is velocity.', MEDIUM, 'Mechanics'),
     mcq('Which type of wave requires a medium to travel?', [{label:'A',value:'Light wave',isCorrect:false},{label:'B',value:'Radio wave',isCorrect:false},{label:'C',value:'Sound wave',isCorrect:true},{label:'D',value:'X-ray',isCorrect:false}], 'Sound waves are mechanical/longitudinal waves that need a medium (solid, liquid, or gas). Electromagnetic waves do not.', MEDIUM, 'Waves & Optics'),
     mcq('What is the speed of light in a vacuum (approximately)?', [{label:'A',value:'3 × 10⁶ m/s',isCorrect:false},{label:'B',value:'3 × 10⁸ m/s',isCorrect:true},{label:'C',value:'3 × 10¹⁰ m/s',isCorrect:false},{label:'D',value:'3 × 10⁴ m/s',isCorrect:false}], 'Speed of light in vacuum: c ≈ 3 × 10⁸ m/s (or 300,000 km/s).', MEDIUM, 'Waves & Optics'),
-    mcq('What is Ohm\'s Law?', [{label:'A',value:'V = IR',isCorrect:true},{label:'B',value:'P = IV',isCorrect:false},{label:'C',value:'E = mc²',isCorrect:false},{label:'D',value:'F = ma',isCorrect:false}], 'Ohm\'s Law: V = IR, where V is voltage, I is current, and R is resistance.', EASY, 'Electricity & Magnetism'),
+    mcq("What is Ohm's Law?", [{label:'A',value:'V = IR',isCorrect:true},{label:'B',value:'P = IV',isCorrect:false},{label:'C',value:'E = mc²',isCorrect:false},{label:'D',value:'F = ma',isCorrect:false}], "Ohm's Law: V = IR, where V is voltage, I is current, and R is resistance.", EASY, 'Electricity & Magnetism'),
     mcq('What happens to the resistance of a conductor when temperature increases?', [{label:'A',value:'It decreases',isCorrect:false},{label:'B',value:'It increases',isCorrect:true},{label:'C',value:'It stays the same',isCorrect:false},{label:'D',value:'It becomes zero',isCorrect:false}], 'In conductors, increasing temperature increases atomic vibrations, which increases resistance.', MEDIUM, 'Electricity & Magnetism'),
     mcq('The law of conservation of energy states:', [{label:'A',value:'Energy can be created but not destroyed',isCorrect:false},{label:'B',value:'Energy cannot be created or destroyed, only transformed',isCorrect:true},{label:'C',value:'Energy is always increasing',isCorrect:false},{label:'D',value:'Energy is always decreasing',isCorrect:false}], 'The first law of thermodynamics: energy cannot be created or destroyed, only converted from one form to another.', EASY, 'Mechanics'),
     mcq('A lens that is thicker at the center than at the edges is called:', [{label:'A',value:'Concave lens',isCorrect:false},{label:'B',value:'Convex lens',isCorrect:true},{label:'C',value:'Plane lens',isCorrect:false},{label:'D',value:'Diverging lens',isCorrect:false}], 'A convex (converging) lens is thicker in the center and converges light rays.', MEDIUM, 'Waves & Optics'),
@@ -156,167 +161,185 @@ const QUESTIONS: Record<string, ReturnType<typeof mcq>[]> = {
     mcq('What type of rock is formed from cooled lava?', [{label:'A',value:'Sedimentary',isCorrect:false},{label:'B',value:'Metamorphic',isCorrect:false},{label:'C',value:'Igneous',isCorrect:true},{label:'D',value:'Fossiliferous',isCorrect:false}], 'Igneous rocks form from the cooling and solidification of magma or lava. Examples: basalt, granite.', EASY, 'Plate Tectonics'),
     mcq('What is the scale 1:50,000 on a map?', [{label:'A',value:'1 cm on the map = 50,000 cm (500 m) on the ground',isCorrect:true},{label:'B',value:'1 cm on the map = 50 cm on the ground',isCorrect:false},{label:'C',value:'1 cm on the map = 5,000 cm on the ground',isCorrect:false},{label:'D',value:'1 cm on the map = 50,000 km on the ground',isCorrect:false}], '1:50,000 means 1 unit on the map equals 50,000 of the same units on the ground. So 1 cm = 50,000 cm = 500 m.', MEDIUM, 'Map Reading'),
     mcq('What type of climate does most of the Caribbean have?', [{label:'A',value:'Desert climate',isCorrect:false},{label:'B',value:'Tropical maritime climate',isCorrect:true},{label:'C',value:'Temperate climate',isCorrect:false},{label:'D',value:'Polar climate',isCorrect:false}], 'Most Caribbean islands have a tropical maritime climate with warm temperatures, high humidity, and distinct wet/dry seasons.', EASY, 'Climate & Weather'),
-    mcq('What causes earthquakes in the Caribbean?', [{label:'A',value:'Volcanic eruptions only',isCorrect:false},{label:'B',value:'Movement of tectonic plates along fault lines',isCorrect:true},{label:'C',value:'Heavy rainfall',isCorrect:false},{label:'D',value:'Ocean currents',isCorrect:false}], 'The Caribbean sits on plate boundaries (Caribbean Plate, North American Plate, South American Plate). Their movement causes earthquakes.', MEDIUM, 'Plate Tectonics'),
-    mcq('What is contour spacing on a topographic map that is close together indicates?', [{label:'A',value:'Flat land',isCorrect:false},{label:'B',value:'Steep slope',isCorrect:true},{label:'C',value:'River',isCorrect:false},{label:'D',value:'Depression',isCorrect:false}], 'Closely spaced contour lines indicate a steep slope. Widely spaced lines indicate a gentle slope.', MEDIUM, 'Map Reading'),
-    mcq('What is the most important economic activity in many Caribbean countries?', [{label:'A',value:'Manufacturing',isCorrect:false},{label:'B',value:'Tourism',isCorrect:true},{label:'C',value:'Mining',isCorrect:false},{label:'D',value:'Fishing',isCorrect:false}], 'Tourism is the leading economic sector in most Caribbean nations, contributing significantly to GDP and employment.', EASY, 'Economic Activities'),
-    mcq('Which layer of the Earth is liquid?', [{label:'A',value:'Crust',isCorrect:false},{label:'B',value:'Mantle',isCorrect:false},{label:'C',value:'Outer core',isCorrect:true},{label:'D',value:'Inner core',isCorrect:false}], 'The outer core is liquid (mostly iron and nickel). The inner core is solid despite higher temperatures.', MEDIUM, 'Plate Tectonics'),
-    mcq('What is population density?', [{label:'A',value:'Total number of people in a country',isCorrect:false},{label:'B',value:'Number of people per unit area',isCorrect:true},{label:'C',value:'Birth rate minus death rate',isCorrect:false},{label:'D',value:'Number of people moving to a country',isCorrect:false}], 'Population density = total population ÷ total land area (usually people per km²).', EASY, 'Population Geography'),
-    mcq('What is the Caribbean Plate?', [{label:'A',value:'A type of food',isCorrect:false},{label:'B',value:'A minor tectonic plate underlying the Caribbean region',isCorrect:true},{label:'C',value:'A continental shelf',isCorrect:false},{label:'D',value:'A type of map',isCorrect:false}], 'The Caribbean Plate is a tectonic plate beneath Central America and the Caribbean Sea, interacting with neighboring plates.', MEDIUM, 'Plate Tectonics'),
-    mcq('What is deforestation?', [{label:'A',value:'Planting new forests',isCorrect:false},{label:'B',value:'Clearing of forests for other land uses',isCorrect:true},{label:'C',value:'Managing forest resources',isCorrect:false},{label:'D',value:'Protecting forests from fire',isCorrect:false}], 'Deforestation is the large-scale removal of forest cover, often for agriculture, logging, or urban development.', EASY, 'Caribbean Environment'),
-    mcq('Which ocean surrounds the Caribbean islands?', [{label:'A',value:'Pacific Ocean',isCorrect:false},{label:'B',value:'Indian Ocean',isCorrect:false},{label:'C',value:'Atlantic Ocean / Caribbean Sea',isCorrect:true},{label:'D',value:'Arctic Ocean',isCorrect:false}], 'The Caribbean islands are surrounded by the Atlantic Ocean to the east and the Caribbean Sea to the west.', EASY, 'Caribbean Environment'),
+    mcq('What causes earthquakes in the Caribbean?', [{label:'A',value:'Volcanic eruptions only',isCorrect:false},{label:'B',value:'Movement of tectonic plates along fault lines',isCorrect:true},{label:'C',value:'Heavy rainfall',isCorrect:false},{label:'D',value:'Ocean currents',isCorrect:false}], 'The Caribbean sits on plate boundaries where the North American and Caribbean plates interact, causing earthquakes.', MEDIUM, 'Plate Tectonics'),
+    mcq('What is the largest island in the Caribbean?', [{label:'A',value:'Jamaica',isCorrect:false},{label:'B',value:'Puerto Rico',isCorrect:false},{label:'C',value:'Cuba',isCorrect:true},{label:'D',value:'Hispaniola',isCorrect:false}], 'Cuba is the largest island in the Caribbean at approximately 109,884 km².', EASY, 'Map Reading'),
+    mcq('Which ocean current affects the Caribbean climate?', [{label:'A',value:'Gulf Stream',isCorrect:false},{label:'B',value:'Canary Current',isCorrect:false},{label:'C',value:'Caribbean Current',isCorrect:true},{label:'D',value:'Benguela Current',isCorrect:false}], 'The Caribbean Current (part of the North Equatorial Current system) flows westward through the Caribbean Sea, influencing climate and marine ecosystems.', MEDIUM, 'Climate & Weather'),
+    mcq('What is deforestation?', [{label:'A',value:'Planting new forests',isCorrect:false},{label:'B',value:'Clearing of forests for other land uses',isCorrect:true},{label:'C',value:'Managing forest resources',isCorrect:false},{label:'D',value:'Protecting forest areas',isCorrect:false}], 'Deforestation is the large-scale removal of forest cover, often for agriculture, urbanization, or logging.', EASY, 'Caribbean Environment'),
+    mcq('What type of farming is most common in the Caribbean?', [{label:'A',value:'Subsistence farming',isCorrect:false},{label:'B',value:'Commercial plantation farming',isCorrect:true},{label:'C',value:'Nomadic herding',isCorrect:false},{label:'D',value:'Hydroponic farming',isCorrect:false}], 'Commercial plantation farming (sugar, bananas, citrus) has historically been the dominant agricultural system in the Caribbean.', MEDIUM, 'Economic Activities'),
+    mcq('What is a coral reef?', [{label:'A',value:'A type of rock formation',isCorrect:false},{label:'B',value:'An underwater ecosystem made of coral organisms',isCorrect:true},{label:'C',value:'A volcanic island',isCorrect:false},{label:'D',value:'A type of seaweed',isCorrect:false}], 'Coral reefs are diverse underwater ecosystems built by colonies of coral polyps, important for marine biodiversity.', EASY, 'Caribbean Environment'),
   ],
   'CAPE-PURE1': [
-    mcq('What is the domain of f(x) = 1/(x-2)?', [{label:'A',value:'All real numbers',isCorrect:false},{label:'B',value:'x ≠ 2',isCorrect:true},{label:'C',value:'x > 2',isCorrect:false},{label:'D',value:'x < 2',isCorrect:false}], 'The function is undefined when x - 2 = 0, so x ≠ 2. Domain is all real numbers except 2.', EASY, 'Functions & Relations'),
-    mcq('What is the derivative of f(x) = x³?', [{label:'A',value:'3x',isCorrect:false},{label:'B',value:'3x²',isCorrect:true},{label:'C',value:'x²',isCorrect:false},{label:'D',value:'3x⁴',isCorrect:false}], 'Using the power rule: d/dx(xⁿ) = nxⁿ⁻¹, so d/dx(x³) = 3x².', MEDIUM, 'Calculus (Differentiation)'),
-    mcq('What is ∫2x dx?', [{label:'A',value:'x² + C',isCorrect:true},{label:'B',value:'2x² + C',isCorrect:false},{label:'C',value:'x + C',isCorrect:false},{label:'D',value:'2 + C',isCorrect:false}], '∫2x dx = 2 × (x²/2) + C = x² + C.', MEDIUM, 'Calculus (Integration)'),
-    mcq('Evaluate: lim(x→0) sin(x)/x', [{label:'A',value:'0',isCorrect:false},{label:'B',value:'1',isCorrect:true},{label:'C',value:'∞',isCorrect:false},{label:'D',value:'undefined',isCorrect:false}], 'This is a standard limit. lim(x→0) sin(x)/x = 1.', MEDIUM, 'Calculus (Limits)'),
-    mcq('What is the period of y = 3sin(2x)?', [{label:'A',value:'π',isCorrect:true},{label:'B',value:'2π',isCorrect:false},{label:'C',value:'π/2',isCorrect:false},{label:'D',value:'3π',isCorrect:false}], 'Period = 2π/|b| = 2π/2 = π for y = a·sin(bx).', MEDIUM, 'Trigonometry & Circular Measure'),
-    mcq('What is the sum of the infinite geometric series: 1 + 1/2 + 1/4 + 1/8 + ... ?', [{label:'A',value:'1',isCorrect:false},{label:'B',value:'3/2',isCorrect:false},{label:'C',value:'2',isCorrect:true},{label:'D',value:'∞',isCorrect:false}], 'S∞ = a/(1-r) = 1/(1-1/2) = 1/(1/2) = 2.', MEDIUM, 'Sequences & Series'),
-    mcq('What is d/dx(ln x)?', [{label:'A',value:'1/x',isCorrect:true},{label:'B',value:'ln x',isCorrect:false},{label:'C',value:'x',isCorrect:false},{label:'D',value:'e^x',isCorrect:false}], 'The derivative of ln(x) is 1/x.', MEDIUM, 'Calculus (Differentiation)'),
-    mcq('If f(x) = 2x² - 3x + 1, what is f\'(2)?', [{label:'A',value:'5',isCorrect:true},{label:'B',value:'8',isCorrect:false},{label:'C',value:'7',isCorrect:false},{label:'D',value:'3',isCorrect:false}], 'f\'(x) = 4x - 3. f\'(2) = 8 - 3 = 5.', MEDIUM, 'Calculus (Differentiation)'),
-    mcq('What is the inverse function of f(x) = 2x + 3?', [{label:'A',value:'f⁻¹(x) = (x-3)/2',isCorrect:true},{label:'B',value:'f⁻¹(x) = 2x - 3',isCorrect:false},{label:'C',value:'f⁻¹(x) = (x+3)/2',isCorrect:false},{label:'D',value:'f⁻¹(x) = x/2 + 3',isCorrect:false}], 'y = 2x + 3 → x = (y-3)/2 → f⁻¹(x) = (x-3)/2.', MEDIUM, 'Functions & Relations'),
-    mcq('What is the derivative of eˣ?', [{label:'A',value:'xeˣ⁻¹',isCorrect:false},{label:'B',value:'eˣ',isCorrect:true},{label:'C',value:'eˣ⁺¹',isCorrect:false},{label:'D',value:'1/x',isCorrect:false}], 'The exponential function eˣ is its own derivative: d/dx(eˣ) = eˣ.', EASY, 'Calculus (Differentiation)'),
-    mcq('What is cos²θ + sin²θ equal to?', [{label:'A',value:'0',isCorrect:false},{label:'B',value:'1',isCorrect:true},{label:'C',value:'2',isCorrect:false},{label:'D',value:'tan θ',isCorrect:false}], 'cos²θ + sin²θ = 1 is the fundamental Pythagorean identity.', EASY, 'Trigonometry & Circular Measure'),
-    mcq('What is the integral of 1/x?', [{label:'A',value:'x² + C',isCorrect:false},{label:'B',value:'ln|x| + C',isCorrect:true},{label:'C',value:'1/x² + C',isCorrect:false},{label:'D',value:'eˣ + C',isCorrect:false}], '∫(1/x) dx = ln|x| + C.', MEDIUM, 'Calculus (Integration)'),
-    mcq('If a sequence has a common ratio of 3 and the first term is 2, what is the 4th term?', [{label:'A',value:'24',isCorrect:false},{label:'B',value:'54',isCorrect:true},{label:'C',value:'18',isCorrect:false},{label:'D',value:'162',isCorrect:false}], 'GP: a₄ = ar³ = 2(3³) = 2(27) = 54.', MEDIUM, 'Sequences & Series'),
-    mcq('What is lim(x→∞) (3x² + x)/(x² - 1)?', [{label:'A',value:'3',isCorrect:true},{label:'B',value:'∞',isCorrect:false},{label:'C',value:'0',isCorrect:false},{label:'D',value:'1',isCorrect:false}], 'Divide numerator and denominator by x²: (3 + 1/x)/(1 - 1/x²) → 3/1 = 3.', HARD, 'Calculus (Limits)'),
+    mcq('What is the domain of f(x) = 1/(x-2)?', [{label:'A',value:'All real numbers except x = 2',isCorrect:true},{label:'B',value:'All real numbers',isCorrect:false},{label:'C',value:'x > 2',isCorrect:false},{label:'D',value:'x < 2',isCorrect:false}], 'The denominator cannot be zero, so x - 2 ≠ 0, meaning x ≠ 2.', EASY, 'Functions & Relations'),
+    mcq('What is the range of f(x) = x² for real x?', [{label:'A',value:'All real numbers',isCorrect:false},{label:'B',value:'y ≥ 0',isCorrect:true},{label:'C',value:'y ≤ 0',isCorrect:false},{label:'D',value:'y > 0',isCorrect:false}], 'x² is always non-negative for real x, so the range is [0, ∞).', EASY, 'Functions & Relations'),
+    mcq('What is the value of sin(π/6)?', [{label:'A',value:'1/2',isCorrect:true},{label:'B',value:'√3/2',isCorrect:false},{label:'C',value:'1',isCorrect:false},{label:'D',value:'0',isCorrect:false}], 'sin(π/6) = sin(30°) = 1/2.', EASY, 'Trigonometry & Circular Measure'),
+    mcq('What is the derivative of f(x) = 3x²?', [{label:'A',value:'6x',isCorrect:true},{label:'B',value:'3x',isCorrect:false},{label:'C',value:'6',isCorrect:false},{label:'D',value:'3x²',isCorrect:false}], "Using the power rule: d/dx(3x²) = 6x.", EASY, 'Calculus (Differentiation)'),
+    mcq('What is the integral of 2x dx?', [{label:'A',value:'x² + C',isCorrect:true},{label:'B',value:'2x² + C',isCorrect:false},{label:'C',value:'x + C',isCorrect:false},{label:'D',value:'2 + C',isCorrect:false}], '∫2x dx = 2(x²/2) + C = x² + C.', EASY, 'Calculus (Integration)'),
+    mcq('What is lim(x→0) sin(x)/x?', [{label:'A',value:'0',isCorrect:false},{label:'B',value:'1',isCorrect:true},{label:'C',value:'∞',isCorrect:false},{label:'D',value:'Undefined',isCorrect:false}], 'This is a standard limit: lim(x→0) sin(x)/x = 1.', MEDIUM, 'Calculus (Limits)'),
+    mcq('Find the second derivative of x³ - 6x² + 11x - 6', [{label:'A',value:'6x - 12',isCorrect:true},{label:'B',value:'3x² - 12x + 11',isCorrect:false},{label:'C',value:'6',isCorrect:false},{label:'D',value:'x³ - 6x²',isCorrect:false}], "f'(x) = 3x² - 12x + 11, f''(x) = 6x - 12.", MEDIUM, 'Calculus (Differentiation)'),
+    mcq('What is the sum of the infinite geometric series 1 + 1/2 + 1/4 + 1/8 + ...?', [{label:'A',value:'1',isCorrect:false},{label:'B',value:'2',isCorrect:true},{label:'C',value:'3',isCorrect:false},{label:'D',value:'Infinity',isCorrect:false}], 'S = a/(1-r) = 1/(1-1/2) = 2.', MEDIUM, 'Sequences & Series'),
+    mcq('What is cos²(x) + sin²(x)?', [{label:'A',value:'0',isCorrect:false},{label:'B',value:'1',isCorrect:true},{label:'C',value:'2',isCorrect:false},{label:'D',value:'Depends on x',isCorrect:false}], 'This is the Pythagorean identity: cos²(x) + sin²(x) = 1 for all x.', EASY, 'Trigonometry & Circular Measure'),
+    mcq('What is the nth term of the arithmetic sequence 3, 7, 11, 15, ...?', [{label:'A',value:'4n - 1',isCorrect:true},{label:'B',value:'3n + 1',isCorrect:false},{label:'C',value:'4n + 3',isCorrect:false},{label:'D',value:'n + 4',isCorrect:false}], 'a = 3, d = 4. nth term = a + (n-1)d = 3 + (n-1)(4) = 4n - 1.', MEDIUM, 'Sequences & Series'),
+    mcq('If f(x) = e^(2x), what is f\'(x)?', [{label:'A',value:'2e^(2x)',isCorrect:true},{label:'B',value:'e^(2x)',isCorrect:false},{label:'C',value:'e^(2x)/2',isCorrect:false},{label:'D',value:'2e^x',isCorrect:false}], "Using the chain rule: d/dx(e^(2x)) = 2e^(2x).", MEDIUM, 'Calculus (Differentiation)'),
+    mcq('What is the inverse function of f(x) = 2x + 3?', [{label:'A',value:'(x - 3)/2',isCorrect:true},{label:'B',value:'2x - 3',isCorrect:false},{label:'C',value:'(x + 3)/2',isCorrect:false},{label:'D',value:'1/(2x + 3)',isCorrect:false}], 'y = 2x + 3 → x = (y-3)/2, so f⁻¹(x) = (x-3)/2.', MEDIUM, 'Functions & Relations'),
   ],
   'CAPE-CS': [
-    mcq('What does CARICOM stand for?', [{label:'A',value:'Caribbean Community',isCorrect:true},{label:'B',value:'Caribbean Commonwealth',isCorrect:false},{label:'C',value:'Caribbean Cooperation Republic',isCorrect:false},{label:'D',value:'Caribbean Coalition',isCorrect:false}], 'CARICOM = Caribbean Community, established by the Treaty of Chaguaramas in 1973.', EASY, 'Regional Integration'),
-    mcq('Which treaty established CARICOM?', [{label:'A',value:'Treaty of Paris',isCorrect:false},{label:'B',value:'Treaty of Chaguaramas',isCorrect:true},{label:'C',value:'Treaty of Versailles',isCorrect:false},{label:'D',value:'Treaty of Rome',isCorrect:false}], 'The Treaty of Chaguaramas was signed in 1973, establishing the Caribbean Community (CARICOM).', MEDIUM, 'Regional Integration'),
-    mcq('What is cultural hybridization?', [{label:'A',value:'Complete replacement of one culture by another',isCorrect:false},{label:'B',value:'The blending of different cultural elements to create new forms',isCorrect:true},{label:'C',value:'Preserving only traditional culture',isCorrect:false},{label:'D',value:'Rejecting all foreign influences',isCorrect:false}], 'Cultural hybridization refers to the mixing and blending of cultural elements from different societies to create new, syncretic forms.', MEDIUM, 'Culture & Society'),
-    mcq('What is the definition of the Caribbean according to the CARICOM perspective?', [{label:'A',value:'Only island nations',isCorrect:false},{label:'B',value:'All countries washed by the Caribbean Sea plus mainland states with Caribbean coastlines',isCorrect:true},{label:'C',value:'Only English-speaking islands',isCorrect:false},{label:'D',value:'All tropical countries in the Americas',isCorrect:false}], 'CARICOM defines the Caribbean broadly, including island and mainland territories with historical, cultural, and economic ties to the region.', MEDIUM, 'Caribbean Identity'),
-    mcq('Which of the following is a push factor for migration in the Caribbean?', [{label:'A',value:'Better job opportunities abroad',isCorrect:false},{label:'B',value:'High unemployment and limited opportunities at home',isCorrect:true},{label:'C',value:'Family reunification',isCorrect:false},{label:'D',value:'Educational scholarships',isCorrect:false}], 'Push factors drive people away from their home country (unemployment, poverty). Pull factors attract them to destination countries.', MEDIUM, 'Economic Development'),
-    mcq('What was the impact of the sugar revolution on Caribbean society?', [{label:'A',value:'It led to the diversification of the economy',isCorrect:false},{label:'B',value:'It transformed the economy from tobacco to sugar and increased demand for enslaved labor',isCorrect:true},{label:'C',value:'It reduced the need for labor',isCorrect:false},{label:'D',value:'It had little impact',isCorrect:false}], 'The sugar revolution (mid-17th century) shifted Caribbean economies to sugar monoculture, dramatically increasing the demand for enslaved African labor.', MEDIUM, 'History of Caribbean Society'),
-    mcq('What is globalization?', [{label:'A',value:'Isolation of national economies',isCorrect:false},{label:'B',value:'The increasing interconnection of countries through trade, technology, and culture',isCorrect:true},{label:'C',value:'The breakup of large countries',isCorrect:false},{label:'D',value:'Local self-sufficiency',isCorrect:false}], 'Globalization refers to the process of increased interconnectedness and interdependence of world economies, cultures, and populations.', EASY, 'Globalization'),
-    mcq('What is the CSME?', [{label:'A',value:'Caribbean Single Market and Economy',isCorrect:true},{label:'B',value:'Caribbean Social Movement for Equality',isCorrect:false},{label:'C',value:'Caribbean States Monetary Exchange',isCorrect:false},{label:'D',value:'Caribbean System of Marine Ecology',isCorrect:false}], 'CSME = Caribbean Single Market and Economy, designed to allow free movement of goods, services, capital, and skilled labor within CARICOM.', MEDIUM, 'Regional Integration'),
-    mcq('Which of the following best describes "creolization"?', [{label:'A',value:'The adoption of European culture entirely',isCorrect:false},{label:'B',value:'The process of cultural mixing that produces new Caribbean identities',isCorrect:true},{label:'C',value:'The preservation of African traditions unchanged',isCorrect:false},{label:'D',value:'The rejection of all colonial influences',isCorrect:false}], 'Creolization is the blending of African, European, Indigenous, and Asian cultural elements to create distinct Caribbean cultures and identities.', MEDIUM, 'Caribbean Identity'),
-    mcq('What is the main challenge of economic dependence in the Caribbean?', [{label:'A',value:'Too much industrial diversity',isCorrect:false},{label:'B',value:'Heavy reliance on a few export commodities and foreign investment',isCorrect:true},{label:'C',value:'Excessive technological innovation',isCorrect:false},{label:'D',value:'Too many trade agreements',isCorrect:false}], 'Caribbean economies often depend heavily on tourism, a few agricultural exports, and foreign direct investment, making them vulnerable to external shocks.', HARD, 'Economic Development'),
-    mcq('The concept of "plantation economy" was developed by:', [{label:'A',value:'V.S. Naipaul',isCorrect:false},{label:'B',value:'Lloyd Best and Kari Levitt',isCorrect:true},{label:'C',value:'Bob Marley',isCorrect:false},{label:'D',value:'Eric Williams',isCorrect:false}], 'Lloyd Best and Kari Levitt developed the plantation economy model to describe the structural economic patterns inherited from colonialism.', HARD, 'Economic Development'),
-    mcq('What is brain drain in the Caribbean context?', [{label:'A',value:'Increase in educated workforce',isCorrect:false},{label:'B',value:'Emigration of skilled and educated professionals to developed countries',isCorrect:true},{label:'C',value:'Investment in education',isCorrect:false},{label:'D',value:'Student exchange programs',isCorrect:false}], 'Brain drain refers to the emigration of highly trained or qualified people from a country, depleting the local talent pool.', MEDIUM, 'Economic Development'),
+    mcq('What is cultural hybridity in the Caribbean context?', [{label:'A',value:'Preserving pure cultural traditions',isCorrect:false},{label:'B',value:'The blending of African, European, Indigenous, and Asian cultural elements',isCorrect:true},{label:'C',value:'Adopting only European culture',isCorrect:false},{label:'D',value:'Rejecting foreign influences',isCorrect:false}], 'Cultural hybridity in the Caribbean refers to the mixing and blending of diverse cultural traditions from Africa, Europe, Indigenous peoples, and Asia.', MEDIUM, 'Caribbean Identity'),
+    mcq('What is the main purpose of CARICOM?', [{label:'A',value:'Military alliance',isCorrect:false},{label:'B',value:'Economic integration and cooperation among Caribbean states',isCorrect:true},{label:'C',value:'Cultural preservation only',isCorrect:false},{label:'D',value:'Environmental regulation',isCorrect:false}], 'CARICOM promotes economic integration, foreign policy coordination, and functional cooperation among Caribbean nations.', EASY, 'Regional Integration'),
+    mcq('Which theory explains Caribbean society as a "plural society"?', [{label:'A',value:'Marxist theory',isCorrect:false},{label:'B',value:'M.G. Smith\'s Plural Society Thesis',isCorrect:true},{label:'C',value:'Functionalist theory',isCorrect:false},{label:'D',value:'Dependency theory',isCorrect:false}], "M.G. Smith's plural society thesis argues that Caribbean societies are composed of different cultural segments that coexist but do not integrate.", MEDIUM, 'Culture & Society'),
+    mcq('What is globalization?', [{label:'A',value:'Isolation of nations',isCorrect:false},{label:'B',value:'The increasing interconnection of the world through trade, technology, and culture',isCorrect:true},{label:'C',value:'Local economic development',isCorrect:false},{label:'D',value:'Political independence',isCorrect:false}], 'Globalization refers to the growing interconnectedness of economies, societies, and cultures through international trade, communication, and technology.', EASY, 'Globalization'),
+    mcq('What was the impact of the sugar industry on Caribbean economies?', [{label:'A',value:'Diversified economies',isCorrect:false},{label:'B',value:'Monoculture dependence and wealth inequality',isCorrect:true},{label:'C',value:'Industrial development',isCorrect:false},{label:'D',value:'Self-sufficiency',isCorrect:false}], 'The sugar industry created monoculture economies dependent on a single export crop, leading to vulnerability to market fluctuations and persistent wealth inequality.', MEDIUM, 'Economic Development'),
+    mcq('What is the defining feature of a "plantation society"?', [{label:'A',value:'Small-scale farming',isCorrect:false},{label:'B',value:'An agricultural system based on large estates using enslaved or cheap labor',isCorrect:true},{label:'C',value:'Industrial manufacturing',isCorrect:false},{label:'D',value:'Tourism-based economy',isCorrect:false}], 'Plantation societies were characterized by large-scale agricultural estates (mainly sugar) worked by enslaved Africans, creating hierarchical social structures.', MEDIUM, 'Culture & Society'),
+    mcq('What is brain drain in the Caribbean context?', [{label:'A',value:'Increase in educated population',isCorrect:false},{label:'B',value:'Emigration of skilled professionals to developed countries',isCorrect:true},{label:'C',value:'Investment in education',isCorrect:false},{label:'D',value:'Cultural exchange programs',isCorrect:false}], 'Brain drain refers to the emigration of highly trained and qualified people from Caribbean countries to more developed nations, depleting local expertise.', MEDIUM, 'Economic Development'),
+    mcq('Which movement advocated for Caribbean political independence?', [{label:'A',value:'Industrial Revolution',isCorrect:false},{label:'B',value:'Nationalist/Independence movements',isCorrect:true},{label:'C',value:'Colonial reform movement',isCorrect:false},{label:'D',value:'Trade union movement only',isCorrect:false}], 'Nationalist movements across the Caribbean (1930s-1960s) advocated for political independence from colonial powers, leading to self-governance.', MEDIUM, 'Political Development'),
+    mcq('What is the CSME?', [{label:'A',value:'Caribbean Single Market and Economy',isCorrect:true},{label:'B',value:'Caribbean States Military Alliance',isCorrect:false},{label:'C',value:'Caribbean Sports Federation',isCorrect:false},{label:'D',value:'Caribbean Student Movement',isCorrect:false}], 'The CSME (Caribbean Single Market and Economy) aims to create a single economic space allowing free movement of goods, services, capital, and skilled labor.', EASY, 'Regional Integration'),
+    mcq('How has tourism affected Caribbean culture?', [{label:'A',value:'No impact whatsoever',isCorrect:false},{label:'B',value:'Both economic benefits and cultural commodification',isCorrect:true},{label:'C',value:'Only positive effects',isCorrect:false},{label:'D',value:'Complete cultural destruction',isCorrect:false}], 'Tourism brings economic benefits but also leads to cultural commodification, where local traditions are packaged for tourist consumption, sometimes distorting authentic cultural practices.', MEDIUM, 'Culture & Society'),
   ],
 }
 
 const ACHIEVEMENTS = [
-  { name: 'First Steps', description: 'Complete your first quiz', icon: '🎯', category: 'study', criteria: '{"type":"quizzes_completed","value":1}', points: 10 },
-  { name: 'Quiz Master', description: 'Complete 10 quizzes', icon: '🏆', category: 'study', criteria: '{"type":"quizzes_completed","value":10}', points: 50 },
-  { name: 'Perfect Score', description: 'Get 100% on a quiz', icon: '💯', category: 'score', criteria: '{"type":"perfect_quiz","value":1}', points: 25 },
-  { name: 'Streak Starter', description: 'Maintain a 3-day study streak', icon: '🔥', category: 'streak', criteria: '{"type":"streak","value":3}', points: 20 },
-  { name: 'On Fire', description: 'Maintain a 7-day study streak', icon: '🔥', category: 'streak', criteria: '{"type":"streak","value":7}', points: 50 },
-  { name: 'Unstoppable', description: 'Maintain a 30-day study streak', icon: '⚡', category: 'streak', criteria: '{"type":"streak","value":30}', points: 200 },
-  { name: 'Bookworm', description: 'Study for 5 hours total', icon: '📚', category: 'study', criteria: '{"type":"study_hours","value":5}', points: 30 },
-  { name: 'Scholar', description: 'Study for 25 hours total', icon: '🎓', category: 'study', criteria: '{"type":"study_hours","value":25}', points: 100 },
-  { name: 'Flashcard Fan', description: 'Create 5 flashcard decks', icon: '🃏', category: 'study', criteria: '{"type":"decks_created","value":5}', points: 20 },
-  { name: 'Note Taker', description: 'Create 10 notes', icon: '📝', category: 'study', criteria: '{"type":"notes_created","value":10}', points: 20 },
-  { name: 'Generous', description: 'Share 3 notes', icon: '🤝', category: 'social', criteria: '{"type":"notes_shared","value":3}', points: 30 },
-  { name: 'Top 10', description: 'Reach top 10 on the leaderboard', icon: '👑', category: 'social', criteria: '{"type":"leaderboard_rank","value":10}', points: 100 },
-  { name: 'All Subjects', description: 'Study all 9 subjects', icon: '🌟', category: 'study', criteria: '{"type":"subjects_studied","value":9}', points: 75 },
-  { name: 'Early Bird', description: 'Start a study session before 7 AM', icon: '🌅', category: 'study', criteria: '{"type":"early_study","value":1}', points: 15 },
-  { name: 'Night Owl', description: 'Study past 10 PM', icon: '🦉', category: 'study', criteria: '{"type":"late_study","value":1}', points: 15 },
-  { name: 'Centurion', description: 'Answer 100 questions total', icon: '💯', category: 'score', criteria: '{"type":"questions_answered","value":100}', points: 75 },
-  { name: 'Wealthy', description: 'Accumulate 500 coins', icon: '💰', category: 'general', criteria: '{"type":"coins","value":500}', points: 50 },
-  { name: 'Dedicated', description: 'Answer 500 questions total', icon: '🏅', category: 'score', criteria: '{"type":"questions_answered","value":500}', points: 200 },
+  { name: 'First Steps', description: 'Complete your first question', icon: '🎯', category: 'study', criteria: JSON.stringify({ type: 'questions_answered', value: 1 }), points: 10 },
+  { name: 'Quiz Master', description: 'Answer 50 questions correctly', icon: '🏆', category: 'score', criteria: JSON.stringify({ type: 'correct_answers', value: 50 }), points: 50 },
+  { name: 'Perfect Score', description: 'Get 100% on a quiz', icon: '💯', category: 'score', criteria: JSON.stringify({ type: 'perfect_quiz', value: 1 }), points: 25 },
+  { name: 'Week Warrior', description: 'Maintain a 7-day study streak', icon: '🔥', category: 'streak', criteria: JSON.stringify({ type: 'streak', value: 7 }), points: 30 },
+  { name: 'Monthly Master', description: 'Maintain a 30-day study streak', icon: '⭐', category: 'streak', criteria: JSON.stringify({ type: 'streak', value: 30 }), points: 100 },
+  { name: 'Subject Explorer', description: 'Study all 9 subjects', icon: '📚', category: 'study', criteria: JSON.stringify({ type: 'subjects_studied', value: 9 }), points: 40 },
+  { name: 'Flashcard Fanatic', description: 'Create 10 flashcard decks', icon: '🗂️', category: 'study', criteria: JSON.stringify({ type: 'decks_created', value: 10 }), points: 30 },
+  { name: 'Note Taker', description: 'Write 20 notes', icon: '📝', category: 'study', criteria: JSON.stringify({ type: 'notes_created', value: 20 }), points: 25 },
+  { name: 'Social Butterfly', description: 'Share 5 notes publicly', icon: '🦋', category: 'social', criteria: JSON.stringify({ type: 'notes_shared', value: 5 }), points: 20 },
+  { name: 'Early Bird', description: 'Study before 7 AM five times', icon: '🐦', category: 'study', criteria: JSON.stringify({ type: 'early_study', value: 5 }), points: 15 },
+  { name: 'Night Owl', description: 'Study after 10 PM ten times', icon: '🦉', category: 'study', criteria: JSON.stringify({ type: 'late_study', value: 10 }), points: 15 },
+  { name: 'Exam Ready', description: 'Create an exam countdown', icon: '📅', category: 'study', criteria: JSON.stringify({ type: 'countdowns_created', value: 1 }), points: 10 },
+  { name: 'Bookmark Collector', description: 'Bookmark 25 questions', icon: '🔖', category: 'study', criteria: JSON.stringify({ type: 'bookmarks', value: 25 }), points: 20 },
+  { name: 'Speed Demon', description: 'Complete a quiz in under 2 minutes', icon: '⚡', category: 'score', criteria: JSON.stringify({ type: 'speed_quiz', value: 1 }), points: 20 },
+  { name: 'Perfectionist', description: 'Master 25 questions', icon: '👑', category: 'score', criteria: JSON.stringify({ type: 'mastered', value: 25 }), points: 60 },
+  { name: 'Marathon Studier', description: 'Study for 10+ hours total', icon: '🏃', category: 'study', criteria: JSON.stringify({ type: 'total_hours', value: 10 }), points: 40 },
+  { name: 'Coin Collector', description: 'Earn 500 coins', icon: '💰', category: 'general', criteria: JSON.stringify({ type: 'coins_earned', value: 500 }), points: 50 },
+  { name: 'Leaderboard Legend', description: 'Reach the top 10 on the weekly leaderboard', icon: '🏅', category: 'social', criteria: JSON.stringify({ type: 'leaderboard_top', value: 10 }), points: 75 },
 ]
 
 const SHOP_ITEMS = [
-  { name: 'Streak Freeze', description: 'Protect your streak for 1 day of inactivity', price: 50, type: 'streak_freeze', metadata: '{"duration":1}' },
-  { name: 'Double XP (1 Hour)', description: 'Earn double XP for the next hour', price: 100, type: 'boost', metadata: '{"duration":3600,"multiplier":2}' },
-  { name: 'Hint Pack (5)', description: 'Get 5 hints to use during quizzes', price: 75, type: 'hint_pack', metadata: '{"count":5}' },
-  { name: 'Avatar: Scholar', description: 'Unlock the Scholar avatar frame', price: 200, type: 'avatar', metadata: '{"avatar":"scholar"}' },
-  { name: 'Avatar: Champion', description: 'Unlock the Champion avatar frame', price: 300, type: 'avatar', metadata: '{"avatar":"champion"}' },
-  { name: 'Avatar: Legend', description: 'Unlock the Legend avatar frame', price: 500, type: 'avatar', metadata: '{"avatar":"legend"}' },
-  { name: 'Theme: Ocean Blue', description: 'Unlock the Ocean Blue color theme', price: 150, type: 'theme', metadata: '{"theme":"ocean"}' },
-  { name: 'Theme: Sunset Gold', description: 'Unlock the Sunset Gold color theme', price: 150, type: 'theme', metadata: '{"theme":"sunset"}' },
-  { name: 'Theme: Forest Green', description: 'Unlock the Forest Green color theme', price: 150, type: 'theme', metadata: '{"theme":"forest"}' },
-  { name: 'Badge: Top Student', description: 'A special badge to show your dedication', price: 250, type: 'badge', metadata: '{"badge":"top_student"}' },
+  { name: 'Streak Freeze', description: 'Protect your streak for one day of inactivity', price: 50, type: 'streak_freeze', metadata: JSON.stringify({ days: 1 }) },
+  { name: 'Extra Life', description: 'Get an extra attempt on your next quiz', price: 30, type: 'boost', metadata: JSON.stringify({ effect: 'extra_attempt' }) },
+  { name: 'Study Timer+', description: 'Unlock advanced study timer with custom intervals', price: 100, type: 'boost', metadata: JSON.stringify({ effect: 'advanced_timer' }) },
+  { name: 'Golden Avatar Frame', description: 'A golden frame around your avatar', price: 200, type: 'avatar', metadata: JSON.stringify({ frame: 'gold' }) },
+  { name: 'Dark Mode Premium', description: 'Unlock premium dark mode theme', price: 150, type: 'theme', metadata: JSON.stringify({ theme: 'dark_premium' }) },
+  { name: 'Neon Theme', description: 'Enable neon-themed UI colors', price: 250, type: 'theme', metadata: JSON.stringify({ theme: 'neon' }) },
+  { name: 'Hint Pack (x5)', description: 'Get 5 hints to use during quizzes', price: 75, type: 'hint_pack', metadata: JSON.stringify({ hints: 5 }) },
+  { name: 'XP Booster', description: 'Double XP for your next 10 questions', price: 80, type: 'boost', metadata: JSON.stringify({ effect: 'double_xp', uses: 10 }) },
+  { name: 'Scholar Badge', description: 'Display the Scholar badge on your profile', price: 300, type: 'badge', metadata: JSON.stringify({ badge: 'scholar' }) },
+  { name: 'Expert Badge', description: 'Display the Expert badge on your profile', price: 500, type: 'badge', metadata: JSON.stringify({ badge: 'expert' }) },
 ]
 
-async function main() {
-  console.log('🌱 Seeding CXC Ace database...')
+async function setupTursoDB() {
+  console.log('\n========================================')
+  console.log('  CXC Ace - Turso Database Setup')
+  console.log('========================================\n')
 
-  // Create subjects and topics
-  for (const subj of SUBJECTS) {
-    const subject = await db.subject.upsert({
-      where: { code: subj.code },
-      update: {},
-      create: {
-        name: subj.name,
-        code: subj.code,
-        description: subj.description,
-        color: subj.color,
-        icon: subj.icon,
-      },
-    })
+  const url = await question('Enter your Turso database URL (e.g. libsql://cxc-ace-xyz.turso.io): ')
+  const token = await question('Enter your Turso auth token: ')
 
-    for (let i = 0; i < subj.topics.length; i++) {
-      await db.topic.upsert({
-        where: { name_subjectId: { name: subj.topics[i], subjectId: subject.id } },
-        update: {},
-        create: {
-          name: subj.topics[i],
-          subjectId: subject.id,
-          order: i,
-        },
-      })
+  if (!url || !token) {
+    console.error('Error: Both URL and token are required.')
+    process.exit(1)
+  }
+
+  console.log('\n[1/3] Connecting to Turso...')
+  const client = createClient({ url: url.trim(), authToken: token.trim() })
+
+  try {
+    await client.execute('SELECT 1')
+    console.log('  Connected successfully!')
+  } catch (err: any) {
+    console.error('  Failed to connect:', err.message)
+    process.exit(1)
+  }
+
+  console.log('\n[2/3] Creating database schema...')
+  const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf-8')
+  
+  // Split by semicolons and execute each statement
+  const statements = schemaSql
+    .split(';')
+    .map(s => s.trim())
+    .filter(s => s.length > 0 && !s.startsWith('--') && s !== 'PRAGMA foreign_keys = ON')
+
+  for (let i = 0; i < statements.length; i++) {
+    try {
+      await client.execute(statements[i] + ';')
+    } catch (err: any) {
+      console.error(`  Error on statement ${i + 1}: ${err.message}`)
     }
   }
-  console.log('✅ Subjects and topics created')
+  console.log('  Schema created successfully!')
 
-  // Create questions
-  for (const [subjectCode, questions] of Object.entries(QUESTIONS)) {
-    const subject = await db.subject.findUnique({ where: { code: subjectCode } })
-    if (!subject) continue
+  console.log('\n[3/3] Seeding data...')
+  const adapter = new PrismaLibSQL({ url: url.trim(), authToken: token.trim() })
+  const db = new PrismaClient({ adapter } as never)
 
-    for (const q of questions) {
-      const topic = await db.topic.findFirst({
-        where: { name: q.topicName, subjectId: subject.id },
-      })
-
-      await db.question.create({
-        data: {
-          type: q.type,
-          difficulty: q.difficulty,
-          content: q.content,
-          options: q.options,
-          correctAnswer: q.correctAnswer,
-          explanation: q.explanation,
-          subjectId: subject.id,
-          topicId: topic?.id ?? null,
-          source: q.source,
-          status: 'APPROVED',
-        },
-      })
-    }
-  }
-  console.log('✅ Questions created')
-
-  // Create achievements
-  for (const a of ACHIEVEMENTS) {
-    await db.achievement.upsert({
-      where: { name: a.name },
-      update: {},
-      create: a,
-    })
-  }
-  console.log('✅ Achievements created')
-
-  // Create shop items
-  for (const item of SHOP_ITEMS) {
-    await db.shopItem.create({
+  // Seed subjects and topics
+  for (const subject of SUBJECTS) {
+    const created = await db.subject.create({
       data: {
-        name: item.name,
-        description: item.description,
-        price: item.price,
-        type: item.type,
-        metadata: item.metadata,
+        name: subject.name,
+        code: subject.code,
+        description: subject.description,
+        color: subject.color,
+        icon: subject.icon,
+        topics: {
+          create: subject.topics.map((name, order) => ({ name, order })),
+        },
       },
     })
-  }
-  console.log('✅ Shop items created')
+    console.log(`  Created subject: ${created.name} with ${subject.topics.length} topics`)
 
-  console.log('🎉 Seeding complete!')
+    // Seed questions for this subject
+    const subjectQuestions = QUESTIONS[subject.code] || []
+    if (subjectQuestions.length > 0) {
+      for (const q of subjectQuestions) {
+        const topic = await db.topic.findFirst({
+          where: { name: q.topicName, subjectId: created.id },
+        })
+        await db.question.create({
+          data: {
+            type: q.type,
+            difficulty: q.difficulty,
+            content: q.content,
+            explanation: q.explanation,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            subjectId: created.id,
+            topicId: topic?.id,
+            source: q.source,
+          },
+        })
+      }
+      console.log(`  Seeded ${subjectQuestions.length} questions for ${subject.name}`)
+    }
+  }
+
+  // Seed achievements
+  for (const a of ACHIEVEMENTS) {
+    await db.achievement.create({ data: a })
+  }
+  console.log(`  Seeded ${ACHIEVEMENTS.length} achievements`)
+
+  // Seed shop items
+  for (const item of SHOP_ITEMS) {
+    await db.shopItem.create({ data: item })
+  }
+  console.log(`  Seeded ${SHOP_ITEMS.length} shop items`)
+
+  await db.$disconnect()
+  console.log('\n========================================')
+  console.log('  Setup complete!')
+  console.log('========================================')
+  console.log('\nNow add these to your Vercel project:')
+  console.log(`  DATABASE_URL=${url}`)
+  console.log(`  DATABASE_AUTH_TOKEN=${token}`)
+  console.log('')
 }
 
-main()
-  .catch(console.error)
-  .finally(() => db.$disconnect())
+setupTursoDB().catch((err) => {
+  console.error('Setup failed:', err)
+  process.exit(1)
+})

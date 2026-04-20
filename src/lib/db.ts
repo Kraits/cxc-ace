@@ -6,21 +6,15 @@ const globalForPrisma = globalThis as unknown as {
 }
 
 function createPrismaClient() {
-  const directUrl = process.env.DIRECT_URL
+  const databaseUrl = process.env.DATABASE_URL!
+  const authToken = process.env.DATABASE_AUTH_TOKEN
 
-  // Use Turso cloud database when DIRECT_URL is set
-  if (directUrl) {
-    const adapter = new PrismaLibSQL({
-      url: directUrl,
-      authToken: process.env.DATABASE_AUTH_TOKEN,
-    })
-    return new PrismaClient({ adapter } as never)
-  }
-
-  // Local SQLite
-  return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['error'] : [],
+  const adapter = new PrismaLibSQL({
+    url: databaseUrl,
+    authToken: authToken || undefined,
   })
+
+  return new PrismaClient({ adapter } as never)
 }
 
 export const db = globalForPrisma.prisma ?? createPrismaClient()
