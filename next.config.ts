@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: true,
   poweredByHeader: false,
+  // Vercel handles standalone output natively
+  serverExternalPackages: ["bcryptjs"],
 };
 
 export default nextConfig;

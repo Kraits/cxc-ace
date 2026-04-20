@@ -85,8 +85,57 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 Create a `.env` file in the project root (see `.env.example`):
 
 ```env
+# Local development
 DATABASE_URL="file:./db/cxc.db"
+
+# Production (Turso — see Deploy section below)
+# DATABASE_URL="libsql://cxc-ace-your-org.turso.io"
+# DATABASE_AUTH_TOKEN="your-turso-auth-token"
 ```
+
+## Deploy to Vercel
+
+The easiest way to deploy CXC Ace is with [Vercel](https://vercel.com) (free):
+
+### 1. Set up Turso Database (free cloud SQLite)
+
+```bash
+# Install Turso CLI
+curl -sSfL https://get.tur.so/install.sh | bash
+
+# Login and create database
+turso auth login
+turso db create cxc-ace
+turso db tokens create cxc-ace    # ← save this token
+turso db show cxc-ace --url       # ← save this URL
+```
+
+### 2. Push Schema & Seed Data
+
+```bash
+# Set your Turso credentials
+export DATABASE_URL="libsql://cxc-ace-your-org.turso.io"
+export DATABASE_AUTH_TOKEN="your-turso-auth-token"
+
+# Push schema and seed
+npx prisma db push
+npx prisma db seed
+```
+
+### 3. Deploy to Vercel
+
+```bash
+npx vercel
+```
+
+Or connect your GitHub repo at [vercel.com/new](https://vercel.com/new) and add these environment variables:
+
+| Variable | Value |
+|----------|-------|
+| `DATABASE_URL` | `libsql://cxc-ace-your-org.turso.io` |
+| `DATABASE_AUTH_TOKEN` | Your Turso auth token |
+
+That's it! Your app will be live at `cxc-ace.vercel.app`.
 
 ## Project Structure
 
