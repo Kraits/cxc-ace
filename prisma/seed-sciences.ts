@@ -2449,7 +2449,7 @@ async function main() {
       // Look up topic
       if (!topicMap.has(q.topicName)) {
         const topic = await db.topic.findFirst({
-          where: { subjectId: subject.id, name: q.topicName },
+          where: { subjectId: subject!.id, name: q.topicName },
         })
         if (topic) {
           topicMap.set(q.topicName, topic.id)
@@ -2467,7 +2467,7 @@ async function main() {
           options: q.options,
           correctAnswer: q.correctAnswer,
           explanation: q.explanation,
-          subjectId: subject.id,
+          subjectId: subject!.id,
           topicId: topicMap.get(q.topicName)!,
           source: q.source,
           status: q.status,
@@ -2507,7 +2507,7 @@ async function main() {
     for (const note of notes) {
       if (!topicMap.has(note.topicName)) {
         const topic = await db.topic.findFirst({
-          where: { subjectId: subject.id, name: note.topicName },
+          where: { subjectId: subject!.id, name: note.topicName },
         })
         if (topic) {
           topicMap.set(note.topicName, topic.id)
@@ -2521,7 +2521,7 @@ async function main() {
       const existing = await db.note.findFirst({
         where: {
           userId: SYSTEM_USER_ID,
-          subjectId: subject.id,
+          subjectId: subject!.id,
           title: note.title,
         },
       })
@@ -2535,7 +2535,7 @@ async function main() {
         data: {
           title: note.title,
           content: note.content,
-          subjectId: subject.id,
+          subjectId: subject!.id,
           color: '#f0fff4',
           isShared: true,
           isPinned: false,
