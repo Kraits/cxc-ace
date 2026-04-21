@@ -279,7 +279,7 @@ export function QuizTaking({ configStr }: { configStr: string }) {
 
   useEffect(() => {
     const params = new URLSearchParams();
-    params.set('subjectId', config.subjectId);
+    if (config.subjectId) params.set('subjectId', config.subjectId);
     params.set('count', config.count.toString());
     if (config.difficulty) params.set('difficulty', config.difficulty);
     if (config.topicId) params.set('topicId', config.topicId);
