@@ -44,54 +44,85 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Questions with filters - only APPROVED questions
-    const where: Record<string, unknown> = {
-      status: 'APPROVED',
-    };
+    const take = count ? Math.min(parseInt(count, 10), 100) : 20;
+    const isExam = searchParams.get('exam') === 'true';
 
-    if (subjectId) where.subjectId = subjectId;
-    if (topicId) where.topicId = topicId;
-    if (difficulty) where.difficulty = difficulty;
-    if (type) where.type = type;
+    // Use SQLite RANDOM() for efficient DB-level random ordering (no over-fetching)
+    // Build params array for SQL injection protection
+    const sqlParams: string[] = [];
+    let paramIndex = 1;
 
-    const take = count ? parseInt(count, 10) : 20;
-
-    // Fetch all matching questions first, then shuffle for random order
-    const allMatching = await db.question.findMany({
-      where,
-      include: {
-        topic: { select: { id: true, name: true } },
-        subject: { select: { id: true, name: true, code: true, color: true } },
-        tags: { include: { tag: { select: { id: true, name: true, color: true } } } },
-      },
-      take: Math.min(take * 3, 300), // fetch more so shuffle still has enough
-      orderBy: { createdAt: 'desc' },
-    });
-
-    // Fisher-Yates shuffle for random question order
-    const shuffled = [...allMatching];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    let whereClause = "q.status = 'APPROVED'";
+    if (subjectId) {
+      whereClause += ` AND q."subjectId" = $${paramIndex++}`;
+      sqlParams.push(subjectId);
+    }
+    if (topicId) {
+      whereClause += ` AND q."topicId" = $${paramIndex++}`;
+      sqlParams.push(topicId);
+    }
+    if (difficulty) {
+      whereClause += ` AND q.difficulty = $${paramIndex++}`;
+      sqlParams.push(difficulty);
+    }
+    if (type) {
+      whereClause += ` AND q.type = $${paramIndex++}`;
+      sqlParams.push(type);
     }
 
-    const questions = shuffled.slice(0, Math.min(take, 100));
+    const questions = await db.$queryRawUnsafe<Array<Record<string, unknown>>>(
+      `SELECT q.id, q.type, q.difficulty, q.content, q.explanation, q.options, q.correctAnswer,
+             q.subjectId, q.topicId,
+             t.id as "topicId_inner", t.name as "topicName",
+             s.id as "subjectId_inner", s.name as "subjectName", s.code as "subjectCode", s.color as "subjectColor"
+      FROM questions q
+      LEFT JOIN topics t ON q."topicId" = t.id
+      LEFT JOIN subjects s ON q."subjectId" = s.id
+      WHERE ${whereClause}
+      ORDER BY RANDOM()
+      LIMIT $${paramIndex}`,
+      ...sqlParams,
+      take,
+    );
 
-    // If user is logged in, include their progress
-    let enrichedQuestions = questions;
-    if (userId) {
+    // Format questions to match the expected structure
+    const formattedQuestions = questions.map((q) => ({
+      id: q.id,
+      type: q.type,
+      difficulty: q.difficulty,
+      content: q.content,
+      explanation: q.explanation,
+      options: q.options,
+      correctAnswer: q.correctAnswer,
+      subjectId: q.subjectId,
+      topicId: q.topicId,
+      subject: q.subjectName ? {
+        id: q.subjectId,
+        name: q.subjectName,
+        code: q.subjectCode,
+        color: q.subjectColor,
+      } : null,
+      topic: q.topicName ? {
+        id: q.topicId_inner,
+        name: q.topicName,
+      } : null,
+    }));
+
+    // Only include user progress for non-exam queries
+    let enrichedQuestions = formattedQuestions;
+    if (userId && !isExam) {
       const progress = await db.userQuestionProgress.findMany({
         where: {
           userId,
-          questionId: { in: questions.map((q) => q.id) },
+          questionId: { in: formattedQuestions.map((q) => q.id as string) },
         },
         select: { questionId: true, attempts: true, correct: true, mastered: true },
       });
 
       const progressMap = new Map(progress.map((p) => [p.questionId, p]));
-      enrichedQuestions = questions.map((q) => ({
+      enrichedQuestions = formattedQuestions.map((q) => ({
         ...q,
-        progress: progressMap.get(q.id) ?? null,
+        progress: progressMap.get(q.id as string) ?? null,
       }));
     }
 

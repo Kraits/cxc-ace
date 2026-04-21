@@ -228,6 +228,7 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
         const params = new URLSearchParams();
         params.set('subjectId', config.subjectId);
         params.set('count', '100');
+        params.set('exam', 'true');
         const res = await fetch(`/api/questions?${params.toString()}`);
         if (!res.ok) throw new Error('Failed to fetch');
         const data = await res.json();
@@ -310,31 +311,33 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
     const timeTaken = totalTime - timeLeft;
     let correctCount = 0;
 
-    // Submit answers to progress API
-    if (user?.id) {
-      const submitPromises = questions.map(question => {
-        const userAnswer = answers.get(question.id);
-        if (!userAnswer) return Promise.resolve();
+    // Build answers array for batch submit
+    const answersList: Array<{ questionId: string; isCorrect: boolean }> = [];
+    questions.forEach(question => {
+      const userAnswer = answers.get(question.id);
+      if (userAnswer) {
         const isCorrect = userAnswer === question.correctAnswer;
         if (isCorrect) correctCount++;
-        return fetch('/api/progress', {
+        answersList.push({ questionId: question.id, isCorrect });
+      }
+    });
+
+    // Single batch API call instead of 100 individual calls
+    if (user?.id && answersList.length > 0) {
+      try {
+        await fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'submit', userId: user.id, questionId: question.id, isCorrect }),
-        }).catch(() => {});
-      });
-      await Promise.all(submitPromises);
+          body: JSON.stringify({ action: 'batch-submit', userId: user.id, answers: answersList }),
+        });
+      } catch (e) {
+        console.error('Failed to submit exam results:', e);
+      }
 
       // Refresh stats
       setTimeout(() => {
         useStore.getState().refreshStats();
       }, 500);
-    } else {
-      // Just calculate correct count without API
-      questions.forEach(question => {
-        const userAnswer = answers.get(question.id);
-        if (userAnswer === question.correctAnswer) correctCount++;
-      });
     }
 
     // Store results for display

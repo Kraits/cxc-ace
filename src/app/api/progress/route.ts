@@ -11,7 +11,11 @@ export async function POST(req: NextRequest) {
       return handleSubmit(body);
     }
 
-    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+    if (action === 'batch-submit') {
+      return handleBatchSubmit(body);
+    }
+
+    return NextResponse.json({ error: 'Invalid action. Use submit or batch-submit.' }, { status: 400 });
   } catch (error) {
     console.error('[PROGRESS POST ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -199,6 +203,173 @@ async function handleSubmit(body: Record<string, unknown>) {
     questionProgress,
     xpGain,
     coinsGain,
+  });
+}
+
+// ── Batch submit exam results (single request for all questions) ──
+async function handleBatchSubmit(body: Record<string, unknown>) {
+  const { userId, answers } = body as {
+    userId: string;
+    answers: Array<{ questionId: string; isCorrect: boolean }>;
+  };
+
+  if (!userId || !answers || !Array.isArray(answers)) {
+    return NextResponse.json(
+      { error: 'userId and answers array are required' },
+      { status: 400 }
+    );
+  }
+
+  // Fetch all questions with topic & subject in a single query
+  const questionIds = answers.map(a => a.questionId);
+  const questions = await db.question.findMany({
+    where: { id: { in: questionIds } },
+    include: { topic: true, subject: true },
+  });
+
+  const questionMap = new Map(questions.map(q => [q.id, q]));
+
+  // Track totals for user update
+  let totalXp = 0;
+  let totalCoins = 0;
+  let correctCount = 0;
+
+  // Process each answer
+  for (const answer of answers) {
+    const question = questionMap.get(answer.questionId);
+    if (!question) continue;
+
+    if (answer.isCorrect) {
+      totalXp += 10;
+      totalCoins += 5;
+      correctCount++;
+    } else {
+      totalXp += 2;
+      totalCoins += 1;
+    }
+
+    // 1. Upsert UserQuestionProgress
+    await db.userQuestionProgress.upsert({
+      where: { userId_questionId: { userId, questionId: answer.questionId } },
+      create: {
+        userId,
+        questionId: answer.questionId,
+        attempts: 1,
+        correct: answer.isCorrect ? 1 : 0,
+        mastered: answer.isCorrect,
+        lastAttemptAt: new Date(),
+      },
+      update: {
+        attempts: { increment: 1 },
+        correct: answer.isCorrect ? { increment: 1 } : undefined,
+        mastered: answer.isCorrect,
+        lastAttemptAt: new Date(),
+      },
+    });
+
+    // 2. Upsert UserTopicProgress
+    if (question.topicId) {
+      const existingTP = await db.userTopicProgress.findUnique({
+        where: { userId_topicId: { userId, topicId: question.topicId } },
+      });
+
+      const newAttempts = (existingTP?.totalAttempts ?? 0) + 1;
+      const newCorrect = (existingTP?.correctAttempts ?? 0) + (answer.isCorrect ? 1 : 0);
+      const newAccuracy = Math.round((newCorrect / newAttempts) * 10000) / 100;
+
+      await db.userTopicProgress.upsert({
+        where: { userId_topicId: { userId, topicId: question.topicId } },
+        create: {
+          userId,
+          topicId: question.topicId,
+          totalAttempts: newAttempts,
+          correctAttempts: newCorrect,
+          accuracy: newAccuracy,
+          lastStudiedAt: new Date(),
+        },
+        update: {
+          totalAttempts: newAttempts,
+          correctAttempts: newCorrect,
+          accuracy: newAccuracy,
+          lastStudiedAt: new Date(),
+        },
+      });
+    }
+
+    // 3. Upsert UserSubjectProgress
+    const existingSP = await db.userSubjectProgress.findUnique({
+      where: { userId_subjectId: { userId, subjectId: question.subjectId } },
+    });
+
+    const spAttempts = (existingSP?.totalAttempts ?? 0) + 1;
+    const spCorrect = (existingSP?.correctAttempts ?? 0) + (answer.isCorrect ? 1 : 0);
+    const spAccuracy = Math.round((spCorrect / spAttempts) * 10000) / 100;
+
+    await db.userSubjectProgress.upsert({
+      where: { userId_subjectId: { userId, subjectId: question.subjectId } },
+      create: {
+        userId,
+        subjectId: question.subjectId,
+        totalAttempts: spAttempts,
+        correctAttempts: spCorrect,
+        accuracy: spAccuracy,
+        questionsStudied: 1,
+        lastStudiedAt: new Date(),
+      },
+      update: {
+        totalAttempts: spAttempts,
+        correctAttempts: spCorrect,
+        accuracy: spAccuracy,
+        questionsStudied: { increment: 1 },
+        lastStudiedAt: new Date(),
+      },
+    });
+  }
+
+  // 4. Update user XP, coins, streak once
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const user = await db.user.findUnique({ where: { id: userId } });
+
+  if (user) {
+    const lastStudy = user.lastStudyAt ? new Date(user.lastStudyAt) : null;
+    let streakIncrement = 0;
+
+    if (lastStudy) {
+      lastStudy.setHours(0, 0, 0, 0);
+      const diffDays = Math.floor((today.getTime() - lastStudy.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays === 1) {
+        streakIncrement = 1;
+      } else if (diffDays > 1) {
+        streakIncrement = 0;
+      }
+    } else {
+      streakIncrement = 1;
+    }
+
+    const newStreak = streakIncrement > 0
+      ? user.currentStreak + streakIncrement
+      : (lastStudy ? (Math.floor((today.getTime() - lastStudy.getTime()) / (1000 * 60 * 60 * 24)) > 1 ? 1 : user.currentStreak) : 1);
+    const newLongestStreak = Math.max(user.longestStreak, newStreak);
+
+    await db.user.update({
+      where: { id: userId },
+      data: {
+        coins: { increment: totalCoins },
+        currentStreak: newStreak,
+        longestStreak: newLongestStreak,
+        lastStudyAt: new Date(),
+      },
+    });
+  }
+
+  return NextResponse.json({
+    success: true,
+    correctCount,
+    totalAnswered: answers.length,
+    xpGain: totalXp,
+    coinsGain: totalCoins,
   });
 }
 
