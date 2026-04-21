@@ -44,13 +44,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // Questions with filters
-    // Include APPROVED questions or those with no status set (for backward compat with seeded data)
+    // Questions with filters - only APPROVED questions
     const where: Record<string, unknown> = {
-      OR: [
-        { status: 'APPROVED' },
-        { status: null },
-      ],
+      status: 'APPROVED',
     };
 
     if (subjectId) where.subjectId = subjectId;

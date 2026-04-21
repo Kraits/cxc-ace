@@ -12,12 +12,7 @@ export async function GET() {
         _count: {
           select: {
             questions: {
-              where: {
-                OR: [
-                  { status: "APPROVED" },
-                  { status: null },
-                ],
-              },
+              where: { status: "APPROVED" },
             },
           },
         },
