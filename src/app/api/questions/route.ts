@@ -45,8 +45,12 @@ export async function GET(req: NextRequest) {
     }
 
     // Questions with filters
+    // Include APPROVED questions or those with no status set (for backward compat with seeded data)
     const where: Record<string, unknown> = {
-      status: 'APPROVED', // Only return approved questions
+      OR: [
+        { status: 'APPROVED' },
+        { status: null },
+      ],
     };
 
     if (subjectId) where.subjectId = subjectId;
@@ -56,16 +60,26 @@ export async function GET(req: NextRequest) {
 
     const take = count ? parseInt(count, 10) : 20;
 
-    const questions = await db.question.findMany({
+    // Fetch all matching questions first, then shuffle for random order
+    const allMatching = await db.question.findMany({
       where,
       include: {
         topic: { select: { id: true, name: true } },
         subject: { select: { id: true, name: true, code: true, color: true } },
         tags: { include: { tag: { select: { id: true, name: true, color: true } } } },
       },
-      take: Math.min(take, 100),
+      take: Math.min(take * 3, 300), // fetch more so shuffle still has enough
       orderBy: { createdAt: 'desc' },
     });
+
+    // Fisher-Yates shuffle for random question order
+    const shuffled = [...allMatching];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    const questions = shuffled.slice(0, Math.min(take, 100));
 
     // If user is logged in, include their progress
     let enrichedQuestions = questions;

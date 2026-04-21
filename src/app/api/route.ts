@@ -9,7 +9,18 @@ export async function GET() {
           select: { id: true, name: true, order: true },
           orderBy: { order: "asc" },
         },
-        _count: { select: { questions: true } },
+        _count: {
+          select: {
+            questions: {
+              where: {
+                OR: [
+                  { status: "APPROVED" },
+                  { status: null },
+                ],
+              },
+            },
+          },
+        },
       },
       orderBy: { name: "asc" },
     });

@@ -99,7 +99,7 @@ export default function FlashcardsView() {
         const data = await res.json();
         const d = data.decks?.find((dk: Deck) => dk.id === deck.id);
         if (d && d.cards && d.cards.length > 0) {
-          setReviewCards(d.cards.map(c => ({ ...c, deck: { title: deck.title, subject: deck.subject as { name: string; color: string } } })));
+          setReviewCards(d.cards.map(c => ({ ...c, deck: { id: deck.id, title: deck.title, subject: deck.subject as { name: string; color: string } } })));
           setReviewMode(true);
           setCurrentCard(0);
           setFlipped(false);
@@ -210,7 +210,7 @@ export default function FlashcardsView() {
           </Button>
           <div>
             <h2 className="text-xl font-bold">{activeDeck.title}</h2>
-            <p className="text-xs text-muted-foreground">{activeDeck.cardCount} cards</p>
+            <p className="text-xs text-muted-foreground">{activeDeck.cards?.length || activeDeck.cardCount || 0} cards</p>
           </div>
         </div>
 
@@ -333,7 +333,7 @@ export default function FlashcardsView() {
                       )}
                       <div className="flex-1">
                         <h4 className="font-semibold text-sm">{deck.title}</h4>
-                        <p className="text-xs text-muted-foreground">{deck.cardCount} cards · {deck.subject?.name || 'General'}</p>
+                        <p className="text-xs text-muted-foreground">{deck.cards?.length || deck.cardCount || 0} cards · {deck.subject?.name || 'General'}</p>
                       </div>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
@@ -367,7 +367,7 @@ export default function FlashcardsView() {
                       )}
                       <div className="flex-1">
                         <h4 className="font-semibold text-sm">{deck.title}</h4>
-                        <p className="text-xs text-muted-foreground">{deck.cardCount} cards · {deck.subject?.name || 'General'}</p>
+                        <p className="text-xs text-muted-foreground">{deck.cards?.length || deck.cardCount || 0} cards · {deck.subject?.name || 'General'}</p>
                       </div>
                       <Play className="w-4 h-4 text-emerald-500" />
                     </div>
