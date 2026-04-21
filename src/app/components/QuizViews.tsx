@@ -10,7 +10,7 @@ import {
 import {
   ArrowLeft, Bookmark, Check, X, Dumbbell, Timer, Play,
   ChevronRight, HomeIcon, RotateCcw, CheckCircle2, XCircle,
-  Sparkles, Zap,
+  Sparkles, Zap, GraduationCap, Clock,
 } from '@/app/lib/icons';
 import { Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -48,6 +48,42 @@ export function SubjectSelection() {
         </Button>
         <h2 className="text-xl font-bold">Choose a Subject</h2>
       </div>
+
+      {/* Real Exams Card — Full Exam Simulations */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
+        <motion.div whileTap={{ scale: 0.98 }}>
+          <Card
+            className="relative overflow-hidden cursor-pointer border-2 border-amber-400 dark:border-amber-600 hover:shadow-lg hover:border-amber-500 transition-all duration-200"
+            onClick={() => setRoute('#real-exam')}
+          >
+            {/* Gradient background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-400 via-orange-500 to-amber-500 opacity-10 dark:opacity-20" />
+            <div className="relative flex items-center gap-4 p-4">
+              <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center shadow-md">
+                <GraduationCap className="w-6 h-6 text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-base text-amber-700 dark:text-amber-400">Real Exams</h3>
+                  <Clock className="w-4 h-4 text-amber-500" />
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Practice with full exam simulations
+                </p>
+              </div>
+              <div className="flex-shrink-0 flex items-center gap-1">
+                <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 hover:bg-amber-100 border-0 text-xs">
+                  <GraduationCap className="w-3 h-3 mr-1" /> Simulate
+                </Badge>
+              </div>
+            </div>
+          </Card>
+        </motion.div>
+      </motion.div>
 
       {/* Quick Quiz Card — All Subjects */}
       <motion.div

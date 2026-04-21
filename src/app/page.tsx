@@ -7,6 +7,7 @@ import { HomeIcon, BookOpen, Brain, BarChart3, User } from '@/app/lib/icons';
 import AuthScreen from '@/app/components/AuthScreen';
 import HomeDashboard from '@/app/components/HomeDashboard';
 import { SubjectSelection, QuizConfig, QuizTaking } from '@/app/components/QuizViews';
+import { RealExamSelection, RealExamTaking } from '@/app/components/RealExamView';
 import { StudyHub } from '@/app/components/StudyViews';
 import { ProgressHub } from '@/app/components/ProgressViews';
 import { ShopView } from '@/app/components/SocialViews';
@@ -83,6 +84,13 @@ export default function Home() {
       if (subjectId.length > 10) return <QuizConfig subjectId={subjectId} />;
     }
 
+    // Real Exam routes
+    if (route === '#real-exam') return <RealExamSelection />;
+    if (route.startsWith('#real-exam-taking-')) {
+      const configStr = route.replace('#real-exam-taking-', '');
+      return <RealExamTaking configStr={configStr} />;
+    }
+
     // Study sub-routes (shown inside StudyHub tabs)
     if (route.startsWith('#tutor') || route.startsWith('#notes') || route.startsWith('#timer') || route.startsWith('#flashcard')) {
       return <StudyHub />;
@@ -108,7 +116,7 @@ export default function Home() {
   // Determine active bottom tab
   const getActiveTab = () => {
     if (route === '#home' || route === '#' || route === '') return 'home';
-    if (route.startsWith('#quiz') || route.startsWith('#subjects')) return 'quiz';
+    if (route.startsWith('#quiz') || route.startsWith('#subjects') || route.startsWith('#real-exam')) return 'quiz';
     if (route.startsWith('#study') || route.startsWith('#tutor') || route.startsWith('#notes') || route.startsWith('#timer') || route.startsWith('#flashcard')) return 'study';
     if (route.startsWith('#progress') || route.startsWith('#bookmarks') || route.startsWith('#leaderboard') || route.startsWith('#analytics')) return 'progress';
     return 'profile';
