@@ -6,7 +6,7 @@ import {
   useStore, LoadingSpinner, fadeIn, scaleIn, SUBJECT_ICONS,
   type Deck,
 } from '@/app/lib/store';
-import { ArrowLeft, Layers, Clock, Plus, ChevronRight, Play } from '@/app/lib/icons';
+import { ArrowLeft, Layers, Clock, Plus, ChevronRight, Play, Sparkles } from '@/app/lib/icons';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +22,7 @@ export default function FlashcardsView() {
   const { user, subjects } = useStore();
   const { toast } = useToast();
   const [decks, setDecks] = useState<Deck[]>([]);
+  const [publicDecks, setPublicDecks] = useState<Deck[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState('');
@@ -44,6 +45,7 @@ export default function FlashcardsView() {
       if (res.ok) {
         const data = await res.json();
         setDecks(data.decks || []);
+        setPublicDecks(data.publicDecks || []);
       }
       const dueRes = await fetch(`/api/flashcards?userId=${user.id}&view=due`);
       if (dueRes.ok) {
@@ -302,39 +304,79 @@ export default function FlashcardsView() {
         </DialogContent>
       </Dialog>
 
-      {decks.length === 0 ? (
+      {decks.length === 0 && publicDecks.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
           <Layers className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p>No decks yet. Create your first deck!</p>
         </div>
       ) : (
-        <div className="space-y-2">
-          {decks.map(deck => (
-            <motion.div key={deck.id} {...fadeIn} whileTap={{ scale: 0.98 }}>
-              <Card
-                className="p-4 cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => { setActiveDeck(deck); loadDecks(); }}
-              >
-                <div className="flex items-center gap-3">
-                  {deck.subject ? (
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: deck.subject.color + '20' }}>
-                      {SUBJECT_ICONS[deck.subject.name] || '📚'}
+        <>
+          {/* My Decks */}
+          {decks.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground">My Decks</h3>
+              {decks.map(deck => (
+                <motion.div key={deck.id} {...fadeIn} whileTap={{ scale: 0.98 }}>
+                  <Card
+                    className="p-4 cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => { setActiveDeck(deck); loadDecks(); }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {deck.subject ? (
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: deck.subject.color + '20' }}>
+                          {SUBJECT_ICONS[deck.subject.name] || '📚'}
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                          <Layers className="w-5 h-5 text-emerald-600" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">{deck.title}</h4>
+                        <p className="text-xs text-muted-foreground">{deck.cardCount} cards · {deck.subject?.name || 'General'}</p>
+                      </div>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </div>
-                  ) : (
-                    <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                      <Layers className="w-5 h-5 text-emerald-600" />
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+
+          {/* Public/Community Decks */}
+          {publicDecks.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="font-semibold text-sm text-muted-foreground flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" /> Study Decks
+              </h3>
+              {publicDecks.map(deck => (
+                <motion.div key={deck.id} {...fadeIn} whileTap={{ scale: 0.98 }}>
+                  <Card
+                    className="p-4 cursor-pointer hover:shadow-md transition-shadow border border-emerald-200 dark:border-emerald-800/50"
+                    onClick={() => { setActiveDeck(deck); loadDecks(); }}
+                  >
+                    <div className="flex items-center gap-3">
+                      {deck.subject ? (
+                        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ backgroundColor: deck.subject.color + '20' }}>
+                          {SUBJECT_ICONS[deck.subject.name] || '📚'}
+                        </div>
+                      ) : (
+                        <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                          <Layers className="w-5 h-5 text-emerald-600" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <h4 className="font-semibold text-sm">{deck.title}</h4>
+                        <p className="text-xs text-muted-foreground">{deck.cardCount} cards · {deck.subject?.name || 'General'}</p>
+                      </div>
+                      <Play className="w-4 h-4 text-emerald-500" />
                     </div>
-                  )}
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm">{deck.title}</h4>
-                    <p className="text-xs text-muted-foreground">{deck.cardCount} cards · {deck.subject?.name || 'General'}</p>
-                  </div>
-                  <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                </div>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );

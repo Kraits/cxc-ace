@@ -16,8 +16,12 @@ export async function GET(req: NextRequest) {
       return getDueCards(userId);
     }
 
-    // Default: get user's decks
-    const decks = await db.flashcardDeck.findMany({
+    if (view === 'public') {
+      return getPublicDecks();
+    }
+
+    // Default: get user's own decks + public decks
+    const userDecks = await db.flashcardDeck.findMany({
       where: { userId },
       include: {
         subject: { select: { id: true, name: true, code: true, color: true } },
@@ -30,7 +34,20 @@ export async function GET(req: NextRequest) {
       orderBy: { updatedAt: 'desc' },
     });
 
-    return NextResponse.json({ decks });
+    const publicDecks = await db.flashcardDeck.findMany({
+      where: { isPublic: true, userId: { not: userId } },
+      include: {
+        subject: { select: { id: true, name: true, code: true, color: true } },
+        cards: {
+          select: { id: true, front: true, back: true, order: true },
+          orderBy: { order: 'asc' },
+        },
+        _count: { select: { reviews: true } },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return NextResponse.json({ decks: userDecks, publicDecks });
   } catch (error) {
     console.error('[FLASHCARDS GET ERROR]', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -236,4 +253,22 @@ async function getDueCards(userId: string) {
     dueCount: dueReviews.length,
     dueCards: dueReviews,
   });
+}
+
+// ── Get all public decks ──────────────────────────────────────
+async function getPublicDecks() {
+  const decks = await db.flashcardDeck.findMany({
+    where: { isPublic: true },
+    include: {
+      subject: { select: { id: true, name: true, code: true, color: true } },
+      cards: {
+        select: { id: true, front: true, back: true, order: true },
+        orderBy: { order: 'asc' },
+      },
+      _count: { select: { reviews: true } },
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return NextResponse.json({ decks });
 }
