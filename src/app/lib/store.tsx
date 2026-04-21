@@ -152,9 +152,23 @@ export interface TutorMessage {
 
 // ─── Constants ───────────────────────────────────────────────
 export const SUBJECT_ICONS: Record<string, string> = {
+  // CSEC
   Mathematics: '📐', 'English A': '📖', Biology: '🧬', Chemistry: '⚗️',
-  Physics: '⚡', History: '📜', Geography: '🌍', 'Pure Mathematics': '∑',
-  'Caribbean Studies': '🏝️',
+  Physics: '⚡', History: '📜', Geography: '🌍',
+  'English B (Literature)': '📚', 'Social Studies': '👥', 'Information Technology': '💻',
+  'Principles of Business': '💼', 'Principles of Accounts': '📊', Economics: '💰',
+  Spanish: '🇪🇸', French: '🇫🇷', 'Agricultural Science': '🌾',
+  'Food & Nutrition': '🍳', 'Physical Education & Sport': '⚽',
+  'Technical Drawing': '📐', 'Office Administration': '🏢',
+  EDPM: '🖥️',
+  Music: '🎵', 'Visual Arts': '🎨',
+  // CAPE
+  'Pure Mathematics': '∑', 'Caribbean Studies': '🏝️',
+  'Applied Mathematics': '📈', 'Communication Studies': '🎙️',
+  'CAPE Biology': '🧫', 'CAPE Chemistry': '⚗️', 'CAPE Physics': '🔬',
+  Sociology: '🌍', 'Management of Business': '👔', Accounting: '📑',
+  'CAPE Information Technology': '🖥️', 'Computer Science': '💻',
+  Law: '⚖️', 'CAPE Economics': '📉',
 };
 
 export const MOTIVATIONAL_QUOTES = [

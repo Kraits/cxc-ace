@@ -112,7 +112,7 @@ export default function HomeDashboard() {
           </Button>
         </div>
         <div className="grid grid-cols-3 gap-2">
-          {subjects.slice(0, 6).map(sub => (
+          {subjects.slice(0, 9).map(sub => (
             <motion.button
               key={sub.id}
               whileTap={{ scale: 0.96 }}
@@ -143,7 +143,7 @@ export default function HomeDashboard() {
           </Button>
         </div>
         <div className="space-y-2">
-          {subjects.slice(0, 4).map(sub => {
+          {subjects.slice(0, 6).map(sub => {
             const sp = stats?.subjectProgresses?.find(s => s.subjectId === sub.id);
             return (
               <motion.button
