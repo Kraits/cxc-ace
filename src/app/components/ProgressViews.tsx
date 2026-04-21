@@ -115,7 +115,7 @@ function AnalyticsDashboard() {
                 <div className="flex items-center gap-3 mb-2">
                   <div className="text-xl">{sub ? (SUBJECT_ICONS[sub.name] || '📚') : '📚'}</div>
                   <div className="flex-1">
-                    <p className="font-medium text-sm">{sp.subject.name}</p>
+                    <p className="font-medium text-sm">{sp.subject?.name || 'Unknown Subject'}</p>
                     <p className="text-xs text-muted-foreground">{sp.questionsStudied} questions studied</p>
                   </div>
                   <Badge variant={sp.accuracy >= 70 ? 'default' : 'destructive'} className={sp.accuracy >= 70 ? 'bg-emerald-600' : ''}>
@@ -146,7 +146,7 @@ function AnalyticsDashboard() {
             {topicProgresses.map(tp => (
               <Card key={tp.id} className="p-3">
                 <div className="flex items-center justify-between mb-1">
-                  <p className="text-sm font-medium">{tp.topic.name}</p>
+                  <p className="text-sm font-medium">{tp.topic?.name || 'Unknown Topic'}</p>
                   <span className={`text-xs font-semibold ${tp.accuracy >= 70 ? 'text-emerald-600' : 'text-amber-600'}`}>
                     {tp.accuracy.toFixed(0)}%
                   </span>
@@ -171,8 +171,8 @@ function AnalyticsDashboard() {
                 <div className="flex items-center gap-3">
                   <Target className="w-4 h-4 text-amber-500" />
                   <div className="flex-1">
-                    <p className="text-sm font-medium">{wt.topic.name}</p>
-                    <p className="text-xs text-muted-foreground">{wt.topic.subject?.name || ''} · {wt.accuracy.toFixed(0)}% accuracy</p>
+                    <p className="text-sm font-medium">{wt.topic?.name || 'Unknown Topic'}</p>
+                    <p className="text-xs text-muted-foreground">{wt.topic?.subject?.name || ''} · {(wt.accuracy ?? 0).toFixed(0)}% accuracy</p>
                   </div>
                 </div>
               </Card>

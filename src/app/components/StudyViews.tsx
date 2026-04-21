@@ -71,9 +71,10 @@ function StudyGuides() {
         <div className="prose prose-sm dark:prose-invert max-w-none bg-white dark:bg-zinc-900 rounded-xl p-5 border">
           <div className="whitespace-pre-wrap leading-relaxed text-sm" dangerouslySetInnerHTML={{
             __html: guide.content
-              .replace(/^# (.*$)/gm, '<h1 class="text-2xl font-bold mt-6 mb-3 text-emerald-700 dark:text-emerald-400">$1</h1>')
-              .replace(/^## (.*$)/gm, '<h2 class="text-xl font-bold mt-5 mb-2 border-b pb-1">$1</h2>')
-              .replace(/^### (.*$)/gm, '<h3 class="text-lg font-semibold mt-4 mb-1">$1</h3>')
+              .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+              .replace(/^# (.*$)/gm, (_, t) => `<h1 class="text-2xl font-bold mt-6 mb-3 text-emerald-700 dark:text-emerald-400">${t}</h1>`)
+              .replace(/^## (.*$)/gm, (_, t) => `<h2 class="text-xl font-bold mt-5 mb-2 border-b pb-1">${t}</h2>`)
+              .replace(/^### (.*$)/gm, (_, t) => `<h3 class="text-lg font-semibold mt-4 mb-1">${t}</h3>`)
               .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
               .replace(/`(.*?)`/g, '<code class="bg-gray-100 dark:bg-zinc-800 px-1.5 py-0.5 rounded text-xs font-mono">$1</code>')
               .replace(/^- (.*$)/gm, '<li class="ml-4">$1</li>')
@@ -205,19 +206,19 @@ function StudyTimer() {
   useEffect(() => {
     if (isRunning) {
       timerRef.current = setInterval(() => {
-        setTimeLeft(t => {
-          if (t <= 1) {
-            clearInterval(timerRef.current!);
-            setIsRunning(false);
-            completeSession();
-            return 0;
-          }
-          return t - 1;
-        });
+        setTimeLeft(t => (t <= 1 ? 0 : t - 1));
       }, 1000);
       return () => { if (timerRef.current) clearInterval(timerRef.current); };
     }
   }, [isRunning, isBreak]);
+
+  useEffect(() => {
+    if (timeLeft === 0 && isRunning) {
+      setIsRunning(false);
+      if (timerRef.current) clearInterval(timerRef.current);
+      completeSession();
+    }
+  }, [timeLeft, isRunning]);
 
   const completeSession = async () => {
     if (!user?.id) return;

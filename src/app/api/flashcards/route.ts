@@ -202,7 +202,7 @@ async function submitReview(body: Record<string, unknown>) {
     // First review
     ease = 2.5;
     repetitions = q < 3 ? 0 : 1;
-    interval = q < 3 ? 1 : 1;
+    interval = 1;
   }
 
   const nextReview = new Date();

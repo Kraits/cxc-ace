@@ -247,7 +247,7 @@ function SBATemplatesView() {
 }
 
 function ProfileView() {
-  const { user, setRoute, logout } = useStore();
+  const { user, stats, setRoute, logout } = useStore();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
 
@@ -290,7 +290,7 @@ function ProfileView() {
               <p className="text-sm text-muted-foreground">{user?.email}</p>
               {user?.bio && <p className="text-xs text-muted-foreground mt-1">{user.bio}</p>}
               <div className="flex items-center gap-3 mt-2 text-sm">
-                <Badge variant="secondary" className="gap-1"><Shield className="w-3 h-3" /> Level {Math.floor(Math.sqrt((useStore.getState().stats?.totalQuestions || 0) / 5)) + 1}</Badge>
+                <Badge variant="secondary" className="gap-1"><Shield className="w-3 h-3" /> Level {Math.floor(Math.sqrt((stats?.totalQuestions || 0) / 5)) + 1}</Badge>
                 <Badge variant="secondary" className="gap-1"><Coins className="w-3 h-3" /> {user?.coins}</Badge>
                 <Badge variant="secondary" className="gap-1"><Flame className="w-3 h-3" /> {user?.currentStreak}</Badge>
               </div>

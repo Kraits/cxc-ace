@@ -10,9 +10,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages array is required' }, { status: 400 });
     }
 
+    const safeSubject = subject ? String(subject).replace(/[^\w\s\-()&]/g, '').slice(0, 100) : '';
+    const safeTopic = topic ? String(topic).replace(/[^\w\s\-()&]/g, '').slice(0, 100) : '';
     const systemPrompt = `You are an expert CXC and CAPE exam tutor for Caribbean students. IMPORTANT: Always respond in English only. You help students understand concepts, solve problems, and prepare for exams. Be encouraging, clear, and concise. Use examples relevant to Caribbean education. Format math with proper notation.${
-      subject ? `\n\nCurrent subject: ${subject}` : ''
-    }${topic ? `\nCurrent topic: ${topic}` : ''}`;
+      safeSubject ? `\n\nCurrent subject: ${safeSubject}` : ''
+    }${safeTopic ? `\nCurrent topic: ${safeTopic}` : ''}`;
 
     // Build messages array with system prompt prepended
     const chatMessages = [

@@ -28,7 +28,7 @@ export default function Home() {
           } else {
             // User not found, clear localStorage
             localStorage.removeItem('cxc-ace-userId');
-            useStore.getState().setUserId(''); // trigger re-render
+            useStore.setState({ userId: null, user: null, stats: null });
           }
         } catch (e) { console.error(e); }
       }
@@ -80,7 +80,7 @@ export default function Home() {
     if (route.startsWith('#quiz-') && route !== '#quiz') {
       // Subject quick-start from home
       const subjectId = route.replace('#quiz-', '');
-      if (subjectId.length > 10) return <QuizConfig subjectId={subjectId} />;
+      return <QuizConfig subjectId={subjectId} />;
     }
 
     // Real Exam routes
@@ -96,7 +96,7 @@ export default function Home() {
     }
 
     // Profile sub-routes
-    if (route === '#bookmarks') return <ProgressHub />;
+    if (route === '#bookmarks' || route === '#leaderboard' || route === '#analytics') return <ProgressHub />;
     if (route === '#shop') return <ShopView />;
     if (route === '#exams') return <ExamCountdownsView />;
     if (route === '#sba') return <SBATemplatesView />;

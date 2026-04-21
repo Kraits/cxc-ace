@@ -112,13 +112,16 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      return purchase;
+      // Get updated balance
+      const updatedUser = await tx.user.findUnique({ where: { id: userId }, select: { coins: true } });
+
+      return { purchase, newBalance: updatedUser!.coins };
     });
 
     return NextResponse.json({
-      purchase: result,
+      purchase: result.purchase,
       message: `Purchased "${item.name}" for ${item.price} coins`,
-      newBalance: user.coins - item.price,
+      newBalance: result.newBalance,
     });
   } catch (error) {
     console.error('[SHOP POST ERROR]', error);

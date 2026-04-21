@@ -43,7 +43,7 @@ export function SubjectSelection() {
   return (
     <div className="space-y-4 pb-4">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={() => setRoute('#quiz')}>
+        <Button variant="ghost" size="icon" onClick={() => setRoute('#home')}>
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <h2 className="text-xl font-bold">Choose a Subject</h2>
@@ -293,8 +293,6 @@ export function QuizTaking({ configStr }: { configStr: string }) {
     };
   }, [configStr]);
 
-  const [mode, ...rest] = useStore(s => s.route).split('-');
-  // The route format is #quiz-taking-practice-xxx or #quiz-taking-exam-xxx
   const routeMode = useMemo(() => {
     const r = useStore.getState().route;
     if (r.includes('practice')) return 'practice' as const;

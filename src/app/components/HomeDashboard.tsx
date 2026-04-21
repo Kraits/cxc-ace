@@ -217,11 +217,11 @@ export default function HomeDashboard() {
                   <Target className="w-5 h-5 text-amber-500" />
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-sm">{wt.topic?.name}</p>
-                  <p className="text-xs text-muted-foreground">{wt.topic?.subject?.name}</p>
+                  <p className="font-medium text-sm">{wt.topic?.name || 'Unknown Topic'}</p>
+                  <p className="text-xs text-muted-foreground">{wt.topic?.subject?.name || ''}</p>
                 </div>
                 <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
-                  {wt.accuracy.toFixed(0)}%
+                  {(wt.accuracy ?? 0).toFixed(0)}%
                 </Badge>
               </Card>
             ))}
