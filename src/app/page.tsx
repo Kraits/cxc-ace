@@ -14,7 +14,7 @@ import { ShopView } from '@/app/components/SocialViews';
 import { ExamCountdownsView, SBATemplatesView, ProfileView } from '@/app/components/ProfileViews';
 
 export default function Home() {
-  const { userId, route, setRoute, fetchSubjects, setLoading, isLoading } = useStore();
+  const { userId, route, setRoute, fetchSubjects, setLoading, isLoading, refreshStats } = useStore();
 
   useEffect(() => {
     const init = async () => {
@@ -25,6 +25,8 @@ export default function Home() {
           if (res.ok) {
             const data = await res.json();
             useStore.getState().setUser(data.user);
+            // Load stats after user is set
+            refreshStats();
           } else {
             // User not found, clear localStorage
             localStorage.removeItem('cxc-ace-userId');

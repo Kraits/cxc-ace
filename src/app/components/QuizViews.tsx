@@ -353,6 +353,8 @@ export function QuizTaking({ configStr }: { configStr: string }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'submit', userId: user.id, questionId: q.id, isCorrect }),
       });
+      // Refresh stats after each answer
+      setTimeout(() => { useStore.getState().refreshStats(); }, 300);
     } catch (e) { console.error(e); }
 
     if (routeMode === 'practice') {

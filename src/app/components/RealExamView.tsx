@@ -25,7 +25,16 @@ import {
 // ─── Helper Functions ──────────────────────────────────────
 
 function isCAPESubject(subjectName: string): boolean {
-  return subjectName === 'Pure Mathematics' || subjectName === 'Caribbean Studies';
+  return subjectName.startsWith('CAPE ') ||
+    subjectName === 'Pure Mathematics' ||
+    subjectName === 'Caribbean Studies' ||
+    subjectName === 'Applied Mathematics' ||
+    subjectName === 'Communication Studies' ||
+    subjectName === 'Sociology' ||
+    subjectName === 'Management of Business' ||
+    subjectName === 'Accounting' ||
+    subjectName === 'Computer Science' ||
+    subjectName === 'Law';
 }
 
 function getExamTypeLabel(subjectName: string): string {
@@ -220,6 +229,7 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
   const [reviewQ, setReviewQ] = useState(0);
 
   const submitExamRef = useRef<((auto?: boolean) => void) | null>(null);
+  const answersListRef = useRef(0);
 
   // Fetch questions
   useEffect(() => {
@@ -324,6 +334,7 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
 
     // Single batch API call instead of 100 individual calls
     if (user?.id && answersList.length > 0) {
+      answersListRef.current = answersList.length;
       try {
         await fetch('/api/progress', {
           method: 'POST',
@@ -387,7 +398,8 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
   // ─── Results View ─────────────────────────────────────
   if (showResults && !reviewMode) {
     const { correctCount, timeTaken } = examResultData;
-    const percentage = questions.length > 0 ? Math.round((correctCount / questions.length) * 100) : 0;
+    const answeredTotal = answersListRef.current;
+    const percentage = answeredTotal > 0 ? Math.round((correctCount / answeredTotal) * 100) : 0;
     const grade = getCXCGrade(percentage);
     const xpGained = correctCount * 10 + (questions.length - correctCount) * 2 + 50;
     const coinsGained = correctCount * 5 + (questions.length - correctCount) * 2 + 25;
@@ -427,7 +439,7 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
         <Card className="p-5">
           <div className="grid grid-cols-2 gap-4">
             <div className="text-center">
-              <p className="text-2xl font-bold text-emerald-600">{correctCount}<span className="text-muted-foreground font-normal">/{questions.length}</span></p>
+              <p className="text-2xl font-bold text-emerald-600">{correctCount}<span className="text-muted-foreground font-normal">/{answeredTotal}</span></p>
               <p className="text-xs text-muted-foreground">Correct</p>
             </div>
             <div className="text-center">
