@@ -272,15 +272,16 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
   }, [examSubmitted, loading, questions.length]);
 
   // Auto-submit and warnings
+  // Only fire after questions have loaded and timer has been set (timeLeft > 0 initially means not started yet)
   useEffect(() => {
-    if (timeLeft === 0 && !examSubmitted) {
+    if (timeLeft === 0 && !examSubmitted && !loading && questions.length > 0) {
       submitExamRef.current?.(true);
     }
-    if (timeLeft === 300 && !timeWarningShownRef.current && !examSubmitted && !showResults) {
+    if (timeLeft === 300 && !timeWarningShownRef.current && !examSubmitted && !showResults && !loading) {
       setShowTimeWarning(true);
       timeWarningShownRef.current = true;
     }
-  }, [timeLeft, examSubmitted, showResults]);
+  }, [timeLeft, examSubmitted, showResults, loading, questions.length]);
 
   // Current question
   const q = questions[currentQ];
