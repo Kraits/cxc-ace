@@ -283,7 +283,7 @@ export function QuizTaking({ configStr }: { configStr: string }) {
   const { setRoute, user } = useStore();
   const { toast } = useToast();
   const config = useMemo(() => {
-    const params = new URLSearchParams(configStr);
+    const params = new URLSearchParams(decodeURIComponent(configStr));
     return {
       subjectId: params.get('subjectId')!,
       count: parseInt(params.get('count') || '10'),

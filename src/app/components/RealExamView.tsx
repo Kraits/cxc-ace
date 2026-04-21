@@ -184,7 +184,7 @@ export function RealExamTaking({ configStr }: { configStr: string }) {
 
   const config = useMemo(() => {
     try {
-      const params = new URLSearchParams(configStr);
+      const params = new URLSearchParams(decodeURIComponent(configStr));
       return {
         subjectId: params.get('subjectId') || '',
         examType: (params.get('examType') || 'cxc') as 'cxc' | 'cape',
