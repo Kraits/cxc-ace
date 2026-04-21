@@ -41,7 +41,7 @@ export default function Home() {
   useEffect(() => {
     const handleHash = () => {
       const hash = window.location.hash || '#home';
-      if (hash !== route) setRoute(hash);
+      if (hash !== useStore.getState().route) setRoute(hash);
     };
     window.addEventListener('hashchange', handleHash);
     // Set initial route from hash
@@ -52,7 +52,6 @@ export default function Home() {
   }, []);
 
   const navigate = useCallback((newRoute: string) => {
-    window.location.hash = newRoute;
     setRoute(newRoute);
   }, []);
 

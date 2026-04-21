@@ -231,7 +231,12 @@ export const useStore = create<AppState>((set, get) => ({
     localStorage.removeItem('cxc-ace-userId');
     set({ userId: null, user: null, stats: null, route: '#home' });
   },
-  setRoute: (route) => set({ route }),
+  setRoute: (route) => {
+    if (typeof window !== 'undefined') {
+      window.location.hash = route;
+    }
+    set({ route });
+  },
   setSubjects: (subjects) => set({ subjects }),
   setStats: (stats) => set({ stats }),
   setLoading: (loading) => set({ isLoading: loading }),
